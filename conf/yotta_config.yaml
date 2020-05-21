@@ -1,0 +1,6 @@
+[http]
+port = ":8090"
+
+[mongo]
+url = "49.234.139.206:27017"
+db = "metabase"
