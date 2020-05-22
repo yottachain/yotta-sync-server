@@ -63,13 +63,13 @@ func ConnecShardsToDB() *mgo.Collection {
 func (m DB) GetBlocksByTimes(g *gin.Context) {
 	c := ConnecBlocksToDB()
 	s := ConnecShardsToDB()
-	var result []Block
+	var blocks []Block
 	var shards []Shard
-	var msg []Msg
-	minID := g.Query("minID")
-	maxID := g.Query("maxID")
-	min, err := strconv.ParseInt(minID, 10, 32)
-	max, err := strconv.ParseInt(maxID, 10, 32)
+	messages := Messages{}
+	start := g.Query("start")
+	end := g.Query("end")
+	min, err := strconv.ParseInt(start, 10, 32)
+	max, err := strconv.ParseInt(end, 10, 32)
 	CheckErr(err)
 	min32 := int32(min)
 	max32 := int32(max)
@@ -85,36 +85,146 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	max64 := BytesToInt64(maxdatas)
 	fmt.Println("min64:", min64)
 	fmt.Println("max64:", max64)
-	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).All(&result)
-	fmt.Println("多少条", len(result))
-	for _, Block := range result {
+	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).All(&blocks)
+	fmt.Println("多少条", len(blocks))
+	size := len(blocks) - 1
 
-		mm := Msg{}
-		mm.ID = Block.ID
-		mm.VNF = Block.VNF
-		mm.AR = Block.AR
-		// var length int
-		VNF := Block.VNF
-		var maxShardId int64
-		maxShardId = Block.ID + int64(VNF)
-		// length = int(VNF)
-		s.Find(bson.M{"_id": bson.M{"$gte": Block.ID, "$lte": maxShardId}}).All(&shards)
-		// for i := 0; i < length; i++ {
-		// 	//根据VNF的值遍历Shards,
-		// 	shard := Shard{}
-		// 	shard.ID = Block.ID + int64(i)
-		// 	s.Find(bson.M{"_id": shard.ID}).One(&shard)
-
-		// 	// fmt.Println("shards：：", shard)
-		// 	shards = append(shards, shard)
-		// }
-		// mm.Shards = shards
-		mm.Shards = shards
-		msg = append(msg, mm)
-	}
-
-	g.JSON(200, msg)
+	//此时间单位内最小的分片ID 和分块ID一样
+	blockMinID := blocks[0].ID
+	blockMaxID := blocks[size].ID
+	blockMaxVNF := blocks[size].VNF - 1
+	shardMaxID := blockMaxID + int64(blockMaxVNF)
+	fmt.Println("min shard id:::", blockMinID)
+	fmt.Println("max shard id:::", shardMaxID)
+	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).All(&shards)
+	messages.Blocks = blocks
+	messages.Shards = shards
+	fmt.Println("本次共查询到的分块数量为 ： ", len(blocks))
+	fmt.Println("本次共查询到的分片数量为 ： ", len(shards))
+	g.JSON(200, messages)
 }
+
+// //GetBlocksByTimes 按时间段查询blocks表
+// func (m DB) GetBlocksByTimes(g *gin.Context) {
+// 	c := ConnecBlocksToDB()
+// 	s := ConnecShardsToDB()
+// 	var result []Block
+// 	var shards []Shard
+// 	var msg []Msg
+// 	minID := g.Query("minID")
+// 	maxID := g.Query("maxID")
+// 	min, err := strconv.ParseInt(minID, 10, 32)
+// 	max, err := strconv.ParseInt(maxID, 10, 32)
+// 	CheckErr(err)
+// 	min32 := int32(min)
+// 	max32 := int32(max)
+// 	//将时间戳转byte
+// 	minbyte := Int32ToBytes(min32)
+// 	maxbyte := Int32ToBytes(max32)
+// 	ee := []byte{0x00, 0x00, 0x00, 0x00}
+// 	mindata := [][]byte{minbyte, ee}
+// 	maxdata := [][]byte{maxbyte, ee}
+// 	mindatas := bytes.Join(mindata, []byte{})
+// 	maxdatas := bytes.Join(maxdata, []byte{})
+// 	min64 := BytesToInt64(mindatas)
+// 	max64 := BytesToInt64(maxdatas)
+// 	fmt.Println("min64:", min64)
+// 	fmt.Println("max64:", max64)
+// 	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).All(&result)
+// 	fmt.Println("多少条", len(result))
+// 	size := len(result) - 1
+
+// 	//此时间单位内最小的分片ID 和分块ID一样
+// 	blockMinID := result[0].ID
+// 	blockMaxID := result[size].ID
+// 	blockMaxVNF := result[size].VNF - 1
+// 	shardMaxID := blockMaxID + int64(blockMaxVNF)
+// 	fmt.Println("min shard id:::", blockMinID)
+// 	fmt.Println("max shard id:::", shardMaxID)
+// 	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).All(&shards)
+// 	var num int
+// 	for _, Block := range result {
+// 		var shardsInBlock []Shard
+// 		mm := Msg{}
+// 		mm.ID = Block.ID
+// 		mm.VNF = Block.VNF
+// 		mm.AR = Block.AR
+// 		sharesLen := int(Block.VNF)
+// 		// var count int
+// 		for i := 0; i < sharesLen; i++ {
+// 			shardsInBlock = append(shardsInBlock, shards[num])
+// 			num++
+
+// 		}
+// 		mm.Shards = shardsInBlock
+
+// 		msg = append(msg, mm)
+// 	}
+// 	fmt.Println("num=====", num)
+
+// 	g.JSON(200, msg)
+// }
+
+// //GetBlocksByTimes 按时间段查询blocks表
+// func (m DB) GetBlocksByTimes(g *gin.Context) {
+// 	c := ConnecBlocksToDB()
+// 	s := ConnecShardsToDB()
+// 	var result []Block
+// 	var shards []Shard
+// 	var msg []Msg
+// 	minID := g.Query("minID")
+// 	maxID := g.Query("maxID")
+// 	min, err := strconv.ParseInt(minID, 10, 32)
+// 	max, err := strconv.ParseInt(maxID, 10, 32)
+// 	CheckErr(err)
+// 	min32 := int32(min)
+// 	max32 := int32(max)
+// 	//将时间戳转byte
+// 	minbyte := Int32ToBytes(min32)
+// 	maxbyte := Int32ToBytes(max32)
+// 	ee := []byte{0x00, 0x00, 0x00, 0x00}
+// 	mindata := [][]byte{minbyte, ee}
+// 	maxdata := [][]byte{maxbyte, ee}
+// 	mindatas := bytes.Join(mindata, []byte{})
+// 	maxdatas := bytes.Join(maxdata, []byte{})
+// 	min64 := BytesToInt64(mindatas)
+// 	max64 := BytesToInt64(maxdatas)
+// 	fmt.Println("min64:", min64)
+// 	fmt.Println("max64:", max64)
+// 	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).All(&result)
+// 	fmt.Println("多少条", len(result))
+// 	size := len(result) - 1
+
+// 	//此时间单位内最小的分片ID 和分块ID一样
+// 	blockMinID := result[0].ID
+// 	blockMaxID := result[size].ID
+// 	blockMaxVNF := result[size].VNF - 1
+// 	shardMaxID := blockMaxID + int64(blockMaxVNF)
+// 	fmt.Println("min shard id:::", blockMinID)
+// 	fmt.Println("max shard id:::", shardMaxID)
+// 	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).All(&shards)
+// 	var num int
+// 	for _, Block := range result {
+// 		var shardsInBlock []Shard
+// 		mm := Msg{}
+// 		mm.ID = Block.ID
+// 		mm.VNF = Block.VNF
+// 		mm.AR = Block.AR
+// 		sharesLen := int(Block.VNF)
+// 		// var count int
+// 		for i := 0; i < sharesLen; i++ {
+// 			shardsInBlock = append(shardsInBlock, shards[num])
+// 			num++
+
+// 		}
+// 		mm.Shards = shardsInBlock
+
+// 		msg = append(msg, mm)
+// 	}
+// 	fmt.Println("num=====", num)
+
+// 	g.JSON(200, msg)
+// }
 
 //GetShardsByBlockIDAndVNF 根据blockid、VNF查shards表
 func (m DB) GetShardsByBlockIDAndVNF(g *gin.Context) {

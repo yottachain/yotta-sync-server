@@ -52,12 +52,12 @@ func OpenUrl(uri string) {
 func cronInit() {
 	go func() {
 		crontab := cron.New()
-		crontab.AddFunc("*/20 * * * *", myfunc) //5S
+		crontab.AddFunc("*/200 * * * *", myfunc) //5S
 		crontab.Start()
 	}()
 }
 
 // 加个定时器
 func myfunc() {
-	fmt.Println("5秒打印一次！！")
+	fmt.Println("Hello,GoLang！！")
 }

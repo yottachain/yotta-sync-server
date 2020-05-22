@@ -1,5 +1,7 @@
 package controllers
 
+import "go.mongodb.org/mongo-driver/bson/primitive"
+
 //Block 数据块id及分片数量
 type Block struct {
 	ID  int64 `bson:"_id"`
@@ -9,11 +11,18 @@ type Block struct {
 
 //Shard 分片信息
 type Shard struct {
-	ID     int64 `bson:"_id"`
-	NodeID int32 `bson:"nodeId"`
-	VHF    byte  `bson:"VHF"`
+	ID     int64            `bson:"_id"`
+	NodeID int32            `bson:"nodeId"`
+	VHF    primitive.Binary `bson:"VHF"`
 }
 
+//Messages 返回消息结构体
+type Messages struct {
+	Blocks []Block
+	Shards []Shard
+}
+
+//Msg 定义消息结构体
 type Msg struct {
 	ID     int64 `bson:"_id"`
 	VNF    int32 `bson:"VNF"`
