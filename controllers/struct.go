@@ -13,30 +13,6 @@ import (
 // 	AR  int32 `bson:"AR"`
 // }
 
-//Block 数据块id及分片数量
-type Block struct {
-	ID     int64    `bson:"_id" json:"_id"`
-	VNF    int32    `bson:"VNF" json:"VNF"`
-	AR     int32    `bson:"AR" json:"AR"`
-	Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
-}
-
-//Shard 分片信息
-type Shard struct {
-	ID      int64  `bson:"_id" json:"_id"`
-	NodeID  int32  `bson:"nodeId" json:"nodeId"`
-	VHF     []byte `bson:"VHF" json:"VHF"`
-	BlockID int64  `bson:"blockid,omitempty" json:"blockId,omitempty"`
-}
-
-// //Shard 分片信息
-// type Shard struct {
-// 	ID      int64  `bson:"_id"`
-// 	NodeID  int32  `bson:"nodeId"`
-// 	VHF     []byte `bson:"VHF"`
-// 	BlockID int64  `bson:"blockId"`
-// }
-
 //WriteShard 用于写入到数据库
 type WriteShard struct {
 	ID      int64            `bson:"_id"`
@@ -51,12 +27,27 @@ type Messages struct {
 	Shards []Shard
 }
 
+type Block struct {
+	ID     int64         `bson:"_id" json:"_id"`
+	VNF    int32         `bson:"VNF" json:"VNF"`
+	AR     int32         `bson:"AR" json:"AR"`
+	Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
+}
+
+//Shard 分片信息
+type Shard struct {
+	ID      int64  `bson:"_id" json:"_id"`
+	NodeID  int32  `bson:"nodeId" json:"nodeId"`
+	VHF     []byte `bson:"VHF" json:"VHF"`
+	BlockID int64  `bson:"blockid,omitempty" json:"blockId,omitempty"`
+}
+
 func (block *Block) UnmarshalJSON(b []byte) error {
 	x := &struct {
-		ID     int64    `bson:"_id" json:"_id"`
-		VNF    int32    `bson:"VNF" json:"VNF"`
-		AR     int32    `bson:"AR" json:"AR"`
-		Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
+		ID     int64         `bson:"_id" json:"_id"`
+		VNF    int32         `bson:"VNF" json:"VNF"`
+		AR     int32         `bson:"AR" json:"AR"`
+		Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
 	}{}
 	err := json.Unmarshal(b, x)
 	if err != nil {
@@ -67,30 +58,7 @@ func (block *Block) UnmarshalJSON(b []byte) error {
 	block.AR = x.AR
 	block.Shards = x.Shards
 	for i := 0; i < len(block.Shards); i++ {
-		block.Shards[i].BlockID = block.ID
+		block.Shards[i].(*Shard).BlockID = block.ID
 	}
 	return nil
 }
-
-//Msg 定义消息结构体
-// type Msg struct {
-// 	ID     int64 `bson:"_id"`
-// 	VNF    int32 `bson:"VNF"`
-// 	AR     int32 `bson:"AR"`
-// 	Shards []Shard
-// }
-
-// func (msg *Msg) MarshalJSON() ([]byte, error) {
-// 	return bson.Marshal(msg)
-// }
-
-// func (msg *Msg) UnmarshalJSON(b []byte) error {
-// 	err := bson.Unmarshal(b, msg)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for i := 0; i < len(msg.Shards); i++ {
-// 		msg.Shards[i].BlockID = msg.ID
-// 	}
-// 	return nil
-// }

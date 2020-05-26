@@ -134,7 +134,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	var num int
 	var count int
 	for _, Block := range blocks {
-		var shardAll []*Shard
+		var shardAll []interface{}
 		VNF := Block.VNF
 		num = int(VNF)
 		for i := 0; i < num; i++ {
@@ -343,8 +343,8 @@ func BytesToInt64(bys []byte) int64 {
 
 //ReceiveInfo 远程请求接收方返回test
 func (m DB) ReceiveInfo(g *gin.Context) {
-	// c := ConnectRecieveBlocksToDB()
-	// s := ConnectReceiveShardsToDB()
+	c := ConnectRecieveBlocksToDB()
+	s := ConnectReceiveShardsToDB()
 	// messages := Messages{}
 	var blocks []Block
 	start := g.Query("start")
@@ -369,6 +369,18 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
+	}
+	for _, Block := range blocks {
+		err1 := c.Insert(&Block)
+		if err1 != nil {
+			fmt.Println(err1)
+			fmt.Println("接收服务器插入Block错误，BlockID:", Block.ID)
+		}
+		err2 := s.Insert(Block.Shards...)
+		if err2 != nil {
+			fmt.Println(err2)
+			fmt.Println("接收服务器批量插入分片错误，所属块ID:", Block.ID)
+		}
 	}
 
 	// blocks := messages.Blocks
