@@ -129,17 +129,28 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	fmt.Println("min shard id:::", blockMinID)
 	fmt.Println("max shard id:::", shardMaxID)
 	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
-	// messages.Blocks = blocks
-	// messages.Shards = shards
 	var num int
 	var count int
-	for _, Block := range blocks {
+	var ccc int
+	for m, Block := range blocks {
+		fmt.Println("分块ID---->M:", Block.ID)
+
 		var shardAll []interface{}
 		VNF := Block.VNF
 		num = int(VNF)
+		if m == 0 {
+			fmt.Println("第一个分片ID:", shards[m].ID)
+			ccc = num
+		} else {
+			fmt.Println("第m个分块：", m, " 第m个分块的第一个分片id:", shards[ccc].ID)
+			ccc = ccc + num
+			fmt.Println("cccccccccc", ccc)
+		}
+
 		for i := 0; i < num; i++ {
 			// shards[count].BlockID = Block.ID
 			shardAll = append(shardAll, &shards[count])
+
 			count++
 		}
 		Block.Shards = shardAll

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -42,6 +43,26 @@ type Shard struct {
 	BlockID int64  `bson:"blockid,omitempty" json:"blockid,omitempty"`
 }
 
+// func (block *Block) UnmarshalJSON(b []byte) error {
+// 	x := &struct {
+// 		ID     int64         `bson:"_id" json:"_id"`
+// 		VNF    int32         `bson:"VNF" json:"VNF"`
+// 		AR     int32         `bson:"AR" json:"AR"`
+// 		Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
+// 	}{}
+// 	err := json.Unmarshal(b, x)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	block.ID = x.ID
+// 	block.VNF = x.VNF
+// 	block.AR = x.AR
+// 	block.Shards = x.Shards
+// 	for i := 0; i < len(block.Shards); i++ {
+// 		block.Shards[i].(map[string]interface{})["blockid"] = block.ID
+// 	}
+// 	return nil
+// }
 func (block *Block) UnmarshalJSON(b []byte) error {
 	x := &struct {
 		ID     int64         `bson:"_id" json:"_id"`
@@ -59,6 +80,8 @@ func (block *Block) UnmarshalJSON(b []byte) error {
 	block.Shards = x.Shards
 	for i := 0; i < len(block.Shards); i++ {
 		block.Shards[i].(map[string]interface{})["blockid"] = block.ID
+		b, _ := base64.StdEncoding.DecodeString(block.Shards[i].(map[string]interface{})["VHF"].(string))
+		block.Shards[i].(map[string]interface{})["VHF"] = b
 	}
 	return nil
 }
