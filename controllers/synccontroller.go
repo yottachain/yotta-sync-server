@@ -54,8 +54,8 @@ func ConnecBlocksToDB() *mgo.Collection {
 func ConnectRecieveBlocksToDB() *mgo.Collection {
 	url := conf.GetRecieveInfo("url")
 	db := conf.GetRecieveInfo("db")
-	fmt.Println("db.....", db)
-	fmt.Println("url.....", url)
+	fmt.Println("receive db.....", db)
+	fmt.Println("receive url.....", url)
 	session, err := mgo.Dial(url)
 	if err != nil {
 		panic(err)
@@ -96,7 +96,8 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	s := ConnectShardsToDB()
 	var blocks []Block
 	var shards []Shard
-	messages := Messages{}
+	var result []Block
+	// messages := Messages{}
 	start := g.Query("start")
 	end := g.Query("end")
 	min, err := strconv.ParseInt(start, 10, 32)
@@ -128,13 +129,26 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	fmt.Println("min shard id:::", blockMinID)
 	fmt.Println("max shard id:::", shardMaxID)
 	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
-	messages.Blocks = blocks
-	messages.Shards = shards
+	// messages.Blocks = blocks
+	// messages.Shards = shards
+	var num int
+	var count int
+	for _, Block := range blocks {
+		var shardAll []*Shard
+		VNF := Block.VNF
+		num = int(VNF)
+		for i := 0; i < num; i++ {
+			shards[count].BlockID = Block.ID
+			shardAll = append(shardAll, &shards[count])
+			count++
+		}
+		Block.Shards = shardAll
+		result = append(result, Block)
+	}
 
 	fmt.Println("本次共查询到的分块数量为 ： ", len(blocks))
 	fmt.Println("本次共查询到的分片数量为 ： ", len(shards))
-	fmt.Println("shard:", shards[0])
-	g.JSON(200, messages)
+	g.JSON(200, result)
 }
 
 // //GetBlocksByTimes 按时间段查询blocks表
@@ -329,77 +343,155 @@ func BytesToInt64(bys []byte) int64 {
 
 //ReceiveInfo 远程请求接收方返回test
 func (m DB) ReceiveInfo(g *gin.Context) {
-	c := ConnectRecieveBlocksToDB()
-	s := ConnectReceiveShardsToDB()
-	messages := Messages{}
+	// c := ConnectRecieveBlocksToDB()
+	// s := ConnectReceiveShardsToDB()
+	// messages := Messages{}
+	var blocks []Block
 	start := g.Query("start")
 	end := g.Query("end")
 	// client := &http.Client{}
 
 	//获取服务端的请求url
-	adds := conf.GetRecieveInfo("adds")
+	addrs := conf.GetRecieveInfo("addrs")
+
+	fmt.Println("addrs:::::", addrs)
 
 	//生成要访问的url
-	url := adds + "/sync/get_blocks?start=" + start + "&end=" + end
+	url := addrs + "/sync/get_blocks?start=" + start + "&end=" + end
 
 	resp, err := http.Get(url)
 	if err != nil {
 		// handle error
 	}
 
+	fmt.Println("url::::", url)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err == nil {
-		fmt.Println("dfsjlksdjksl")
-		err = json.Unmarshal(body, &messages)
-	}
-	blocks := messages.Blocks
-
-	shards := messages.Shards
-	var count int
-	var num int
-	var msg []Msg
-	for _, Block := range blocks {
-		mm := Msg{}
-		VNF := Block.VNF
-		num = int(VNF)
-		mm.ID = Block.ID
-		mm.AR = Block.AR
-		mm.VNF = Block.VNF
-		var shardsInBlock []Shard
-		for i := 0; i < num; i++ {
-			shards[count].BlockID = Block.ID
-			shardsInBlock = append(shardsInBlock, shards[count])
-			count++
-		}
-		mm.Shards = shardsInBlock
-		msg = append(msg, mm)
-	}
-	for _, Msg := range msg {
-		var block Block
-		var shardss []Shard
-		block.ID = Msg.ID
-		block.AR = Msg.AR
-		block.VNF = Msg.VNF
-		shardss = Msg.Shards
-		var items []interface{}
-
-		for _, sd := range shardss {
-			items = append(items, sd)
-		}
-		err := c.Insert(&block)
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("出错的分块ID:", block.ID)
-
-		}
-		fmt.Println("批量插入shards")
-		errs := s.Insert(items...)
-		if errs != nil {
-			fmt.Println(errs)
-
-		}
+		err = json.Unmarshal(body, &blocks)
 	}
 
-	g.JSON(200, msg)
+	// blocks := messages.Blocks
+
+	// shards := messages.Shards
+	// for _, Block := range blocks {
+	// 	mm := Msg{}
+	// 	VNF := Block.VNF
+	// 	num = int(VNF)
+	// 	mm.ID = Block.ID
+	// 	mm.AR = Block.AR
+	// 	mm.VNF = Block.VNF
+	// 	var shardsInBlock []Shard
+	// 	for i := 0; i < num; i++ {
+	// 		shards[count].BlockID = Block.ID
+	// 		shardsInBlock = append(shardsInBlock, shards[count])
+	// 		count++
+	// 	}
+	// 	mm.Shards = shardsInBlock
+	// 	msg = append(msg, mm)
+	// }
+	// for _, Msg := range msg {
+	// 	var block Block
+	// 	var shardss []Shard
+	// 	block.ID = Msg.ID
+	// 	block.AR = Msg.AR
+	// 	block.VNF = Msg.VNF
+	// 	shardss = Msg.Shards
+	// 	var items []interface{}
+
+	// 	for _, sd := range shardss {
+	// 		items = append(items, sd)
+	// 	}
+	// 	err := c.Insert(&block)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		fmt.Println("出错的块ID:", block.ID)
+
+	// 	}
+	// 	fmt.Println("批量插入shards,所属blockID:::", block.ID)
+	// 	errs := s.Insert(items...)
+	// 	if errs != nil {
+	// 		fmt.Println(errs)
+	// 	}
+	// }
+
+	g.JSON(200, blocks)
 }
+
+//ReceiveInfo 远程请求接收方返回test
+// func (m DB) ReceiveInfo(g *gin.Context) {
+// 	c := ConnectRecieveBlocksToDB()
+// 	s := ConnectReceiveShardsToDB()
+// 	messages := Messages{}
+// 	start := g.Query("start")
+// 	end := g.Query("end")
+// 	// client := &http.Client{}
+
+// 	//获取服务端的请求url
+// 	addrs := conf.GetRecieveInfo("addrs")
+
+// 	fmt.Println("addrs:::::", addrs)
+
+// 	//生成要访问的url
+// 	url := addrs + "/sync/get_blocks?start=" + start + "&end=" + end
+
+// 	resp, err := http.Get(url)
+// 	if err != nil {
+// 		// handle error
+// 	}
+
+// 	fmt.Println("url::::", url)
+// 	defer resp.Body.Close()
+// 	body, err := ioutil.ReadAll(resp.Body)
+// 	if err == nil {
+// 		err = json.Unmarshal(body, &messages)
+// 	}
+// 	blocks := messages.Blocks
+
+// 	shards := messages.Shards
+// 	var count int
+// 	var num int
+// 	var msg []Msg
+// 	for _, Block := range blocks {
+// 		mm := Msg{}
+// 		VNF := Block.VNF
+// 		num = int(VNF)
+// 		mm.ID = Block.ID
+// 		mm.AR = Block.AR
+// 		mm.VNF = Block.VNF
+// 		var shardsInBlock []Shard
+// 		for i := 0; i < num; i++ {
+// 			shards[count].BlockID = Block.ID
+// 			shardsInBlock = append(shardsInBlock, shards[count])
+// 			count++
+// 		}
+// 		mm.Shards = shardsInBlock
+// 		msg = append(msg, mm)
+// 	}
+// 	for _, Msg := range msg {
+// 		var block Block
+// 		var shardss []Shard
+// 		block.ID = Msg.ID
+// 		block.AR = Msg.AR
+// 		block.VNF = Msg.VNF
+// 		shardss = Msg.Shards
+// 		var items []interface{}
+
+// 		for _, sd := range shardss {
+// 			items = append(items, sd)
+// 		}
+// 		err := c.Insert(&block)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			fmt.Println("出错的块ID:", block.ID)
+
+// 		}
+// 		fmt.Println("批量插入shards,所属blockID:::", block.ID)
+// 		errs := s.Insert(items...)
+// 		if errs != nil {
+// 			fmt.Println(errs)
+// 		}
+// 	}
+
+// 	g.JSON(200, msg)
+// }

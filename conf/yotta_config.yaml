@@ -9,4 +9,4 @@ db = "metabase"
 [receive]
 url = "212.64.42.223:27017"
 db = "metabase"
-adds = "212.64.42.223:8087"
+addrs = "http://212.64.42.223:8087"
