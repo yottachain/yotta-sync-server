@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/base64"
 	"encoding/json"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -28,11 +27,12 @@ type Messages struct {
 	Shards []Shard
 }
 
+//Block 数据块id及分片数量
 type Block struct {
-	ID     int64         `bson:"_id" json:"_id"`
-	VNF    int32         `bson:"VNF" json:"VNF"`
-	AR     int32         `bson:"AR" json:"AR"`
-	Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
+	ID     int64    `bson:"_id" json:"_id"`
+	VNF    int32    `bson:"VNF" json:"VNF"`
+	AR     int32    `bson:"AR" json:"AR"`
+	Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
 }
 
 //Shard 分片信息
@@ -40,35 +40,15 @@ type Shard struct {
 	ID      int64  `bson:"_id" json:"_id"`
 	NodeID  int32  `bson:"nodeId" json:"nodeId"`
 	VHF     []byte `bson:"VHF" json:"VHF"`
-	BlockID int64  `bson:"blockid,omitempty" json:"blockid,omitempty"`
+	BlockID int64  `bson:"blockid,omitempty" json:"blockId,omitempty"`
 }
 
-// func (block *Block) UnmarshalJSON(b []byte) error {
-// 	x := &struct {
-// 		ID     int64         `bson:"_id" json:"_id"`
-// 		VNF    int32         `bson:"VNF" json:"VNF"`
-// 		AR     int32         `bson:"AR" json:"AR"`
-// 		Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
-// 	}{}
-// 	err := json.Unmarshal(b, x)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	block.ID = x.ID
-// 	block.VNF = x.VNF
-// 	block.AR = x.AR
-// 	block.Shards = x.Shards
-// 	for i := 0; i < len(block.Shards); i++ {
-// 		block.Shards[i].(map[string]interface{})["blockid"] = block.ID
-// 	}
-// 	return nil
-// }
 func (block *Block) UnmarshalJSON(b []byte) error {
 	x := &struct {
-		ID     int64         `bson:"_id" json:"_id"`
-		VNF    int32         `bson:"VNF" json:"VNF"`
-		AR     int32         `bson:"AR" json:"AR"`
-		Shards []interface{} `bson:"shards,omitempty" json:"shards,omitempty"`
+		ID     int64    `bson:"_id" json:"_id"`
+		VNF    int32    `bson:"VNF" json:"VNF"`
+		AR     int32    `bson:"AR" json:"AR"`
+		Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
 	}{}
 	err := json.Unmarshal(b, x)
 	if err != nil {
@@ -79,9 +59,7 @@ func (block *Block) UnmarshalJSON(b []byte) error {
 	block.AR = x.AR
 	block.Shards = x.Shards
 	for i := 0; i < len(block.Shards); i++ {
-		block.Shards[i].(map[string]interface{})["blockid"] = block.ID
-		b, _ := base64.StdEncoding.DecodeString(block.Shards[i].(map[string]interface{})["VHF"].(string))
-		block.Shards[i].(map[string]interface{})["VHF"] = b
+		block.Shards[i].BlockID = block.ID
 	}
 	return nil
 }
