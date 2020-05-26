@@ -19,6 +19,7 @@ func InitRouter() (router *gin.Engine) {
 		{
 			v1.GET("/get_blocks", t1.GetBlocksByTimes)
 			v1.GET("/get_shards", t1.GetShardsByBlockIDAndVNF)
+			v1.GET("/get_receive", t1.ReceiveInfo)
 		}
 	}
 

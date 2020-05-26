@@ -11,6 +11,13 @@ type Block struct {
 
 //Shard 分片信息
 type Shard struct {
+	ID     int64  `bson:"_id"`
+	NodeID int32  `bson:"nodeId"`
+	VHF    []byte `bson:"VHF"`
+}
+
+//WriteShard 用于写入到数据库
+type WriteShard struct {
 	ID     int64            `bson:"_id"`
 	NodeID int32            `bson:"nodeId"`
 	VHF    primitive.Binary `bson:"VHF"`

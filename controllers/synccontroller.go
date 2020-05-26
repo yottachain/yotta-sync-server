@@ -3,7 +3,10 @@ package controllers
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -101,6 +104,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	messages.Shards = shards
 	fmt.Println("本次共查询到的分块数量为 ： ", len(blocks))
 	fmt.Println("本次共查询到的分片数量为 ： ", len(shards))
+	fmt.Println("shard:", shards[0])
 	g.JSON(200, messages)
 }
 
@@ -292,4 +296,60 @@ func BytesToInt64(bys []byte) int64 {
 	var data int64
 	binary.Read(bytebuff, binary.BigEndian, &data)
 	return data
+}
+
+//ReceiveInfo 远程请求接收方返回test
+func (m DB) ReceiveInfo(g *gin.Context) {
+	c := ConnecBlocksToDB()
+	// s := ConnecShardsToDB()
+	messages := Messages{}
+	start := g.Query("start")
+	end := g.Query("end")
+	// client := &http.Client{}
+
+	//生成要访问的url
+	url := "http://212.64.42.223:8087/sync/get_blocks?start=" + start + "&end=" + end
+
+	resp, err := http.Get(url)
+	if err != nil {
+		// handle error
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		fmt.Println("dfsjlksdjksl")
+		err = json.Unmarshal(body, &messages)
+	}
+	blocks := messages.Blocks
+	// shards := messages.Shards
+
+	for i, Block := range blocks {
+
+		fmt.Println("正在更新数据块：：：：", i)
+
+		err := c.Insert(&Block)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("插入失败数据库信息：ID,VNF,AR ", Block.ID, Block.VNF, Block.AR)
+			// panic(err)
+		}
+	}
+
+	shards := messages.Shards
+	for i, WriteShard := range shards {
+		fmt.Println("正在更新数据分片：：：：", i)
+		ss := WriteShard.VHF
+		fmt.Println(string(ss))
+		// ss := string(Shard.VHF.Data)
+		// fmt.Println("ss", ss)
+		// err := s.Insert(&Shard)
+		// if err != nil {
+		// 	fmt.Println(err)
+
+		// 	// panic(err)
+		// }
+	}
+	// return result, err
+	g.JSON(200, messages)
 }

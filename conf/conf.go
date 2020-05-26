@@ -13,3 +13,13 @@ func GetConfigInfo(expectKey string) string {
 	}
 	return cfg.Section("mongo").Key(expectKey).String()
 }
+
+//GetRecieveInfo 从配置文件读取要写的数据库信息
+func GetRecieveInfo(expectKey string) string {
+	cfg, err := ini.Load("../conf/yotta_config.yaml")
+
+	if err != nil {
+		panic(err)
+	}
+	return cfg.Section("receive").Key(expectKey).String()
+}
