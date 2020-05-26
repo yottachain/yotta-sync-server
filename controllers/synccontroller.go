@@ -138,7 +138,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 		VNF := Block.VNF
 		num = int(VNF)
 		for i := 0; i < num; i++ {
-			shards[count].BlockID = Block.ID
+			// shards[count].BlockID = Block.ID
 			shardAll = append(shardAll, &shards[count])
 			count++
 		}
@@ -370,16 +370,22 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
 	}
-	for _, Block := range blocks {
-		err1 := c.Insert(&Block)
+	fmt.Println("lengththhtht", len(blocks))
+	for _, bb := range blocks {
+		fmt.Println("blockssdsfjsjkdfs", bb.ID)
+		b := Block{}
+		b.ID = bb.ID
+		b.AR = bb.AR
+		b.VNF = bb.VNF
+		err1 := c.Insert(&b)
 		if err1 != nil {
 			fmt.Println(err1)
-			fmt.Println("接收服务器插入Block错误，BlockID:", Block.ID)
+			fmt.Println("接收服务器插入Block错误，BlockID:", bb.ID)
 		}
-		err2 := s.Insert(Block.Shards...)
+		err2 := s.Insert(bb.Shards...)
 		if err2 != nil {
 			fmt.Println(err2)
-			fmt.Println("接收服务器批量插入分片错误，所属块ID:", Block.ID)
+			fmt.Println("接收服务器批量插入分片错误，所属块ID:", bb.ID)
 		}
 	}
 

@@ -39,7 +39,7 @@ type Shard struct {
 	ID      int64  `bson:"_id" json:"_id"`
 	NodeID  int32  `bson:"nodeId" json:"nodeId"`
 	VHF     []byte `bson:"VHF" json:"VHF"`
-	BlockID int64  `bson:"blockid,omitempty" json:"blockId,omitempty"`
+	BlockID int64  `bson:"blockid,omitempty" json:"blockid,omitempty"`
 }
 
 func (block *Block) UnmarshalJSON(b []byte) error {
@@ -58,7 +58,7 @@ func (block *Block) UnmarshalJSON(b []byte) error {
 	block.AR = x.AR
 	block.Shards = x.Shards
 	for i := 0; i < len(block.Shards); i++ {
-		block.Shards[i].(*Shard).BlockID = block.ID
+		block.Shards[i].(map[string]interface{})["blockid"] = block.ID
 	}
 	return nil
 }
