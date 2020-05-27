@@ -27,6 +27,14 @@ type Messages struct {
 	Shards []Shard
 }
 
+//Record 同步信息记录表
+type Record struct {
+	// ID        int64 `bson:"_id" json:"_id"`
+	StartTime int32 `bson:"start" json:"start"`
+	EndTime   int32 `bson:"end" json:"end"`
+	Sn        int   `bson:"sn" json:"sn"`
+}
+
 //Block 数据块id及分片数量
 type Block struct {
 	ID     int64    `bson:"_id" json:"_id"`

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/yottachain/yotta-sync-server/conf"
@@ -63,6 +64,22 @@ func ConnectRecieveBlocksToDB() *mgo.Collection {
 	//defer session.Close()
 	session.SetMode(mgo.Monotonic, true)
 	c := session.DB(db).C("blocks")
+	return c
+}
+
+//ConnectRecieveRecordToDB 连接接收端数据库 block
+func ConnectRecieveRecordToDB() *mgo.Collection {
+	url := conf.GetRecieveInfo("url")
+	db := conf.GetRecieveInfo("db")
+	fmt.Println("receive db.....", db)
+	fmt.Println("receive url.....", url)
+	session, err := mgo.Dial(url)
+	if err != nil {
+		panic(err)
+	}
+	//defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB(db).C("record")
 	return c
 }
 
@@ -236,8 +253,18 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	s := ConnectReceiveShardsToDB()
 	// messages := Messages{}
 	var blocks []Block
-	start := g.Query("start")
-	end := g.Query("end")
+	record := Record{}
+	t := ConnectRecieveRecordToDB()
+	// c.Find(bson.M{"_id": i32,"poolOwner":poolOwner}).One(&node)
+	t.Find(bson.M{"sn": 0}).Sort("-1").Limit(1).One(&record)
+	fmt.Println("record查到最新的开始时间：", record.StartTime)
+	fmt.Println("record查到最新的结束时间：", record.EndTime)
+	time := conf.GetRecieveInfo("time")
+	start := strconv.Itoa(int(record.EndTime))
+	timee, err := strconv.Atoi(time)
+	end := strconv.Itoa(int(record.EndTime) + timee)
+	// start := g.Query("start")
+	// end := g.Query("end")
 	// client := &http.Client{}
 
 	//获取服务端的请求url
@@ -261,7 +288,7 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	}
 	for _, bb := range blocks {
 		var items []interface{}
-		fmt.Println("blockssdsfjsjkdfs", bb.ID)
+		// fmt.Println("blockssdsfjsjkdfs", bb.ID)
 		b := Block{}
 		b.ID = bb.ID
 		b.AR = bb.AR
@@ -361,3 +388,146 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 
 // 	g.JSON(200, msg)
 // }
+
+//CreateInitSyncRecord 创建初始同步记录
+func (m DB) CreateInitSyncRecord(g *gin.Context) {
+	start := conf.GetRecieveInfo("start")
+	time := conf.GetRecieveInfo("time")
+
+	min, err := strconv.ParseInt(start, 10, 32)
+	time32, err := strconv.ParseInt(time, 10, 32)
+	max := min + time32
+	CheckErr(err)
+	min32 := int32(min)
+	max32 := int32(max)
+	//将时间戳转byte
+	// minbyte := Int32ToBytes(min32)
+	// maxbyte := Int32ToBytes(max32)
+	// ee := []byte{0x00, 0x00, 0x00, 0x00}
+	// mindata := [][]byte{minbyte, ee}
+	// maxdata := [][]byte{maxbyte, ee}
+	// mindatas := bytes.Join(mindata, []byte{})
+	// maxdatas := bytes.Join(maxdata, []byte{})
+	// min64 := BytesToInt64(mindatas)
+	// max64 := BytesToInt64(maxdatas)
+	c := ConnectRecieveRecordToDB()
+	for i := 0; i < 5; i++ {
+		record := Record{}
+		record.StartTime = min32
+		record.EndTime = max32
+		record.Sn = i
+		c.Insert(&record)
+	}
+
+	g.String(200, "tttteseeeess")
+}
+
+//insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
+func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
+	c := ConnectRecieveBlocksToDB()
+	s := ConnectReceiveShardsToDB()
+	t := ConnectRecieveRecordToDB()
+	var blocks []Block
+	addrs := conf.GetRecieveInfo(snAttrs)
+	fmt.Println("addrs:::::", addrs)
+
+	//生成要访问的url
+	url := addrs + "/sync/get_blocks?start=" + start + "&end=" + end
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("获取数据失败", addrs)
+		return
+	}
+
+	fmt.Println("url::::", url)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		err = json.Unmarshal(body, &blocks)
+	}
+	for _, bb := range blocks {
+		var items []interface{}
+		// fmt.Println("blockssdsfjsjkdfs", bb.ID)
+		b := Block{}
+		b.ID = bb.ID
+		b.AR = bb.AR
+		b.VNF = bb.VNF
+		err1 := c.Insert(&b)
+		if err1 != nil {
+			fmt.Println(err1)
+			fmt.Println("接收服务器插入Block错误，BlockID:", bb.ID)
+		}
+		for _, ss := range bb.Shards {
+			items = append(items, ss)
+		}
+		err2 := s.Insert(items...)
+		if err2 != nil {
+			fmt.Println(err2)
+			fmt.Println("接收服务器批量插入分片错误，所属块ID:", bb.ID)
+		}
+		record := Record{}
+		startTime, err := strconv.ParseInt(start, 10, 32)
+		entTime, err := strconv.ParseInt(end, 10, 32)
+		CheckErr(err)
+		min32 := int32(startTime)
+		max32 := int32(entTime)
+
+		record.StartTime = min32
+		record.EndTime = max32
+		record.Sn = sn
+		err3 := t.Insert(&record)
+		if err3 != nil {
+			fmt.Println(err3)
+			fmt.Println("时间段开始时间：", start, "结束时间：", end, "同步的sn: sn", sn, "此时间段内同步完成进入下一时间段")
+		}
+	}
+}
+
+//RunService 启动线程函数
+func RunService(wg sync.WaitGroup) {
+
+	sncount := conf.GetRecieveInfo("sncount")
+	countnum, err := strconv.ParseInt(sncount, 10, 32)
+
+	if err != nil {
+
+	}
+
+	var result []*Record
+	num := int(countnum)
+
+	c := ConnectRecieveRecordToDB()
+	for i := 0; i < num; i++ {
+		r := new(Record)
+		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
+		result = append(result, r)
+	}
+	time := conf.GetRecieveInfo("time")
+	time32, err := strconv.ParseInt(time, 10, 32)
+	for _, record := range result {
+		r := record
+		go func() {
+			mm := 0
+			for num > 0 {
+				fmt.Println("Goroutine ", r.Sn)
+				var start string
+				var end string
+				if mm == 0 {
+					start = fmt.Sprintf("%d", r.EndTime)
+					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
+				} else {
+					c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
+					start = fmt.Sprintf("%d", r.EndTime)
+					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
+				}
+
+				addr := conf.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
+				insertBlocksAndShardsFromService(addr, start, end, r.Sn)
+				mm++
+			}
+			wg.Done()
+		}()
+		wg.Add(1)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/go-ini/ini"
@@ -16,6 +17,8 @@ import (
 
 func main() {
 	log.Info(time.Now().Format("2006-01-02 15:04:05") + "strart ......")
+
+	var wg sync.WaitGroup
 	flag.Parse()
 
 	cfg, err := ini.Load("../conf/yotta_config.yaml")
@@ -34,7 +37,8 @@ func main() {
 		panic(err1)
 	}
 	log.Info("strart ......")
-
+	RunService(wg)
+	wg.Wait()
 }
 
 var commands = map[string]string{
