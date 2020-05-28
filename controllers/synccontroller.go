@@ -145,7 +145,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	shardMaxID := blockMaxID + int64(blockMaxVNF)
 	fmt.Println("min shard id:::", blockMinID)
 	fmt.Println("max shard id:::", shardMaxID)
-	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
+	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lt": shardMaxID}}).Sort("_id").All(&shards)
 	var num int
 	var count int
 	var ccc int
