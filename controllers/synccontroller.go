@@ -468,20 +468,24 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 			fmt.Println("Insert shards error，blockID:", bb.ID)
 		}
 		record := Record{}
-		startTime, err := strconv.ParseInt(start, 10, 32)
+		// startTime, err := strconv.ParseInt(start, 10, 32)
 		entTime, err := strconv.ParseInt(end, 10, 32)
 		CheckErr(err)
-		min32 := int32(startTime)
-		max32 := int32(entTime)
+		time := conf.GetRecieveInfo("time")
+		time32, err := strconv.ParseInt(time, 10, 32)
+		min32 := int32(entTime)
+		max32 := int32(entTime) + int32(time32)
 
 		record.StartTime = min32
 		record.EndTime = max32
 		record.Sn = sn
-		err3 := t.Insert(&record)
+		selector := bson.M{"sn": record.Sn}
+		data := bson.M{"start": record.StartTime, "end": record.EndTime}
+		err3 := t.Update(selector, data)
 		if err3 != nil {
 			fmt.Println(err3)
-			fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 		}
+		fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	}
 }
 
@@ -520,8 +524,8 @@ func RunService(wg *sync.WaitGroup) {
 					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
 				} else {
 					c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
-					start = fmt.Sprintf("%d", r.EndTime)
-					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
+					start = fmt.Sprintf("%d", r.StartTime)
+					end = fmt.Sprintf("%d", r.EndTime)
 				}
 
 				addr := conf.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
