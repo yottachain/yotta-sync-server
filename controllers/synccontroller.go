@@ -149,33 +149,36 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	var num int
 	var count int
 	var ccc int
-	for m, Block := range blocks {
-		fmt.Println("Block ID------>M:", Block.ID)
+	if len(blocks) > 0 {
+		for m, Block := range blocks {
+			fmt.Println("Block ID------>M:", Block.ID)
 
-		var shardAll []*Shard
-		VNF := Block.VNF
-		num = int(VNF)
-		if m == 0 {
-			fmt.Println("First Shard ID:", shards[m].ID)
-			ccc = num
-		} else {
-			ccc = ccc + num
-			fmt.Println("cccccccccc", ccc)
+			var shardAll []*Shard
+			VNF := Block.VNF
+			num = int(VNF)
+			if m == 0 {
+				fmt.Println("First Shard ID:", shards[m].ID)
+				ccc = num
+			} else {
+				ccc = ccc + num
+				fmt.Println("cccccccccc", ccc)
+			}
+
+			for i := 0; i < num; i++ {
+				// shards[count].BlockID = Block.ID
+				fmt.Println("count::::", count)
+				shardAll = append(shardAll, &shards[count])
+
+				count++
+			}
+			Block.Shards = shardAll
+			result = append(result, Block)
 		}
 
-		for i := 0; i < num; i++ {
-			// shards[count].BlockID = Block.ID
-			fmt.Println("count::::", count)
-			shardAll = append(shardAll, &shards[count])
-
-			count++
-		}
-		Block.Shards = shardAll
-		result = append(result, Block)
+		fmt.Println("blocks total counts : ", len(blocks))
+		fmt.Println("Shards total counts : ", len(shards))
 	}
 
-	fmt.Println("blocks total counts : ", len(blocks))
-	fmt.Println("Shards total counts : ", len(shards))
 	g.JSON(200, result)
 }
 
@@ -311,84 +314,6 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	g.JSON(200, blocks)
 }
 
-//ReceiveInfo 远程请求接收方返回test
-// func (m DB) ReceiveInfo(g *gin.Context) {
-// 	c := ConnectRecieveBlocksToDB()
-// 	s := ConnectReceiveShardsToDB()
-// 	messages := Messages{}
-// 	start := g.Query("start")
-// 	end := g.Query("end")
-// 	// client := &http.Client{}
-
-// 	//获取服务端的请求url
-// 	addrs := conf.GetRecieveInfo("addrs")
-
-// 	fmt.Println("addrs:::::", addrs)
-
-// 	//生成要访问的url
-// 	url := addrs + "/sync/get_blocks?start=" + start + "&end=" + end
-
-// 	resp, err := http.Get(url)
-// 	if err != nil {
-// 		// handle error
-// 	}
-
-// 	fmt.Println("url::::", url)
-// 	defer resp.Body.Close()
-// 	body, err := ioutil.ReadAll(resp.Body)
-// 	if err == nil {
-// 		err = json.Unmarshal(body, &messages)
-// 	}
-// 	blocks := messages.Blocks
-
-// 	shards := messages.Shards
-// 	var count int
-// 	var num int
-// 	var msg []Msg
-// 	for _, Block := range blocks {
-// 		mm := Msg{}
-// 		VNF := Block.VNF
-// 		num = int(VNF)
-// 		mm.ID = Block.ID
-// 		mm.AR = Block.AR
-// 		mm.VNF = Block.VNF
-// 		var shardsInBlock []Shard
-// 		for i := 0; i < num; i++ {
-// 			shards[count].BlockID = Block.ID
-// 			shardsInBlock = append(shardsInBlock, shards[count])
-// 			count++
-// 		}
-// 		mm.Shards = shardsInBlock
-// 		msg = append(msg, mm)
-// 	}
-// 	for _, Msg := range msg {
-// 		var block Block
-// 		var shardss []Shard
-// 		block.ID = Msg.ID
-// 		block.AR = Msg.AR
-// 		block.VNF = Msg.VNF
-// 		shardss = Msg.Shards
-// 		var items []interface{}
-
-// 		for _, sd := range shardss {
-// 			items = append(items, sd)
-// 		}
-// 		err := c.Insert(&block)
-// 		if err != nil {
-// 			fmt.Println(err)
-// 			fmt.Println("出错的块ID:", block.ID)
-
-// 		}
-// 		fmt.Println("批量插入shards,所属blockID:::", block.ID)
-// 		errs := s.Insert(items...)
-// 		if errs != nil {
-// 			fmt.Println(errs)
-// 		}
-// 	}
-
-// 	g.JSON(200, msg)
-// }
-
 //CreateInitSyncRecord 创建初始同步记录
 func (m DB) CreateInitSyncRecord(g *gin.Context) {
 	start := conf.GetRecieveInfo("start")
@@ -400,16 +325,7 @@ func (m DB) CreateInitSyncRecord(g *gin.Context) {
 	CheckErr(err)
 	min32 := int32(min)
 	max32 := int32(max)
-	//将时间戳转byte
-	// minbyte := Int32ToBytes(min32)
-	// maxbyte := Int32ToBytes(max32)
-	// ee := []byte{0x00, 0x00, 0x00, 0x00}
-	// mindata := [][]byte{minbyte, ee}
-	// maxdata := [][]byte{maxbyte, ee}
-	// mindatas := bytes.Join(mindata, []byte{})
-	// maxdatas := bytes.Join(maxdata, []byte{})
-	// min64 := BytesToInt64(mindatas)
-	// max64 := BytesToInt64(maxdatas)
+
 	c := ConnectRecieveRecordToDB()
 	for i := 0; i < 5; i++ {
 		record := Record{}
@@ -429,8 +345,6 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	t := ConnectRecieveRecordToDB()
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
-	// addrs := conf.GetRecieveInfo(snAttrs)
-	// fmt.Println("addrs:::::", addrs)
 
 	//生成要访问的url
 	url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
@@ -447,46 +361,50 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
 	}
-	for _, bb := range blocks {
-		var items []interface{}
-		// fmt.Println("blockssdsfjsjkdfs", bb.ID)
-		b := Block{}
-		b.ID = bb.ID
-		b.AR = bb.AR
-		b.VNF = bb.VNF
-		err1 := c.Insert(&b)
-		if err1 != nil {
-			fmt.Println(err1)
-			fmt.Println("Insert Block error，BlockID:", bb.ID)
-		}
-		for _, ss := range bb.Shards {
-			items = append(items, ss)
-		}
-		err2 := s.Insert(items...)
-		if err2 != nil {
-			fmt.Println(err2)
-			fmt.Println("Insert shards error，blockID:", bb.ID)
-		}
-		record := Record{}
-		// startTime, err := strconv.ParseInt(start, 10, 32)
-		entTime, err := strconv.ParseInt(end, 10, 32)
-		CheckErr(err)
-		time := conf.GetRecieveInfo("time")
-		time32, err := strconv.ParseInt(time, 10, 32)
-		min32 := int32(entTime)
-		max32 := int32(entTime) + int32(time32)
+	if len(blocks) > 0 {
+		for _, bb := range blocks {
+			var items []interface{}
+			// fmt.Println("blockssdsfjsjkdfs", bb.ID)
+			b := Block{}
+			b.ID = bb.ID
+			b.AR = bb.AR
+			b.VNF = bb.VNF
+			err1 := c.Insert(&b)
+			if err1 != nil {
+				fmt.Println(err1)
+				fmt.Println("Insert Block error，BlockID:", bb.ID)
+			}
+			for _, ss := range bb.Shards {
+				items = append(items, ss)
+			}
+			err2 := s.Insert(items...)
+			if err2 != nil {
+				fmt.Println(err2)
+				fmt.Println("Insert shards error，blockID:", bb.ID)
+			}
 
-		record.StartTime = min32
-		record.EndTime = max32
-		record.Sn = sn
-		selector := bson.M{"sn": record.Sn}
-		data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
-		err3 := t.Update(selector, data)
-		if err3 != nil {
-			fmt.Println(err3)
 		}
-		fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	}
+	record := Record{}
+	// startTime, err := strconv.ParseInt(start, 10, 32)
+	entTime, err := strconv.ParseInt(end, 10, 32)
+	CheckErr(err)
+	time := conf.GetRecieveInfo("time")
+	time32, err := strconv.ParseInt(time, 10, 32)
+	min32 := int32(entTime)
+	max32 := int32(entTime) + int32(time32)
+
+	record.StartTime = min32
+	record.EndTime = max32
+	record.Sn = sn
+	selector := bson.M{"sn": record.Sn}
+	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
+	err3 := t.Update(selector, data)
+	if err3 != nil {
+		fmt.Println(err3)
+	}
+	fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
+
 }
 
 //RunService 启动线程函数
