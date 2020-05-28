@@ -8,40 +8,44 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-ini/ini"
 	"github.com/prometheus/common/log"
 	"github.com/robfig/cron"
 	"github.com/yottachain/yotta-sync-server/conf"
 	"github.com/yottachain/yotta-sync-server/controllers"
 	"github.com/yottachain/yotta-sync-server/routers"
-	"github.com/yottachain/yotta-sync-server/utils"
 )
 
 func main() {
-	log.Info(time.Now().Format("2006-01-02 15:04:05") + " strart ......")
-	service := conf.GetRecieveInfo("service")
+	cfg, err := conf.CreateConfig("../conf/yotta_config.yaml")
+	if err != nil {
+		panic(err)
+	}
+	//conf := &conf.Config
+	log.Info(time.Now().Format("2006-01-02 15:04:05") + " start ......")
+	service := cfg.GetRecieveInfo("service")
 	log.Info("service::::::::", "off" == service)
-	log.Info("   strart ......")
+	log.Info("   start ......")
 	fmt.Println("service::::::::", "off" == service)
 	if service == "off" {
 		wg := &sync.WaitGroup{}
 		fmt.Println("Start Thread service ..............")
-		controllers.RunService(wg)
+		controllers.RunService(wg, cfg)
 		wg.Wait()
+		return
 	}
 	flag.Parse()
 
-	cfg, err := ini.Load("../conf/yotta_config.yaml")
-	if err != nil {
-		panic(err)
-	}
+	// cfg, err := ini.Load("../conf/yotta_config.yaml")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	utils.Config = cfg
+	// utils.Config = cfg
 
-	router := routers.InitRouter()
-	cronInit()
+	router := routers.InitRouter(cfg)
+	// cronInit()
 
-	port := cfg.Section("http").Key("port").String()
+	port := cfg.GetHTTPInfo("port")
 	err1 := router.Run(port)
 	if err1 != nil {
 		panic(err1)

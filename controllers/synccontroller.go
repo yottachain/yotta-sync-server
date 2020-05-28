@@ -12,15 +12,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/yottachain/yotta-sync-server/conf"
-	"go.mongodb.org/mongo-driver/mongo"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 //DB 定义mongo连接
-type DB struct {
-	Mgo *mongo.Database
-}
+// type DB struct {
+// 	Mgo *mongo.Database
+// }
 
 // 根据文件名，段名，键名获取ini的值
 // func getValue(expectKey string) string {
@@ -35,82 +33,84 @@ type DB struct {
 // }
 
 //ConnecBlocksToDB 查询用户表
-func ConnecBlocksToDB() *mgo.Collection {
+// func (dao *Dao) ConnecBlocksToDB() *mgo.Collection {
 
-	url := conf.GetConfigInfo("url")
-	db := conf.GetConfigInfo("db")
-	fmt.Println("db.....", db)
-	fmt.Println("url.....", url)
-	session, err := mgo.Dial(url)
-	if err != nil {
-		panic(err)
-	}
-	//defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(db).C("blocks")
-	return c
-}
+// 	url := conf.GetConfigInfo("url")
+// 	db := conf.GetConfigInfo("db")
+// 	fmt.Println("db.....", db)
+// 	fmt.Println("url.....", url)
+// 	session, err := mgo.Dial(url)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	//defer session.Close()
+// 	session.SetMode(mgo.Monotonic, true)
+// 	c := session.DB(db).C("blocks")
+// 	return c
+// }
 
-//ConnectRecieveBlocksToDB 连接接收端数据库 block
-func ConnectRecieveBlocksToDB() *mgo.Collection {
-	url := conf.GetRecieveInfo("url")
-	db := conf.GetRecieveInfo("db")
-	fmt.Println("receive db.....", db)
-	fmt.Println("receive url.....", url)
-	session, err := mgo.Dial(url)
-	if err != nil {
-		panic(err)
-	}
-	//defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(db).C("blocks")
-	return c
-}
+// //ConnectRecieveBlocksToDB 连接接收端数据库 block
+// func ConnectRecieveBlocksToDB() *mgo.Collection {
+// 	url := conf.GetRecieveInfo("url")
+// 	db := conf.GetRecieveInfo("db")
+// 	fmt.Println("receive db.....", db)
+// 	fmt.Println("receive url.....", url)
+// 	session, err := mgo.Dial(url)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	//defer session.Close()
+// 	session.SetMode(mgo.Monotonic, true)
+// 	c := session.DB(db).C("blocks")
+// 	return c
+// }
 
-//ConnectRecieveRecordToDB 连接接收端数据库 block
-func ConnectRecieveRecordToDB() *mgo.Collection {
-	url := conf.GetRecieveInfo("url")
-	db := conf.GetRecieveInfo("db")
-	fmt.Println("receive db.....", db)
-	fmt.Println("receive url.....", url)
-	session, err := mgo.Dial(url)
-	if err != nil {
-		panic(err)
-	}
-	//defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(db).C("record")
-	return c
-}
+// //ConnectRecieveRecordToDB 连接接收端数据库 block
+// func ConnectRecieveRecordToDB() *mgo.Collection {
+// 	url := conf.GetRecieveInfo("url")
+// 	db := conf.GetRecieveInfo("db")
+// 	fmt.Println("receive db.....", db)
+// 	fmt.Println("receive url.....", url)
+// 	session, err := mgo.Dial(url)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	//defer session.Close()
+// 	session.SetMode(mgo.Monotonic, true)
+// 	c := session.DB(db).C("record")
+// 	return c
+// }
 
-// ConnectShardsToDB 连接Shard表
-func ConnectShardsToDB() *mgo.Collection {
-	session, err := mgo.Dial(conf.GetConfigInfo("url"))
-	if err != nil {
-		panic(err)
-	}
-	//defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(conf.GetConfigInfo("db")).C("shards")
-	return c
-}
+// // ConnectShardsToDB 连接Shard表
+// func ConnectShardsToDB() *mgo.Collection {
+// 	session, err := mgo.Dial(conf.GetConfigInfo("url"))
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	//defer session.Close()
+// 	session.SetMode(mgo.Monotonic, true)
+// 	c := session.DB(conf.GetConfigInfo("db")).C("shards")
+// 	return c
+// }
 
-//ConnectReceiveShardsToDB 连接接收端Shard表
-func ConnectReceiveShardsToDB() *mgo.Collection {
-	session, err := mgo.Dial(conf.GetRecieveInfo("url"))
-	if err != nil {
-		panic(err)
-	}
-	//defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(conf.GetRecieveInfo("db")).C("shards")
-	return c
-}
+// //ConnectReceiveShardsToDB 连接接收端Shard表
+// func ConnectReceiveShardsToDB() *mgo.Collection {
+// 	session, err := mgo.Dial(conf.GetRecieveInfo("url"))
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	//defer session.Close()
+// 	session.SetMode(mgo.Monotonic, true)
+// 	c := session.DB(conf.GetRecieveInfo("db")).C("shards")
+// 	return c
+// }
 
 //GetBlocksByTimes 按时间段查询blocks表
-func (m DB) GetBlocksByTimes(g *gin.Context) {
-	c := ConnecBlocksToDB()
-	s := ConnectShardsToDB()
+func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
+	// c := ConnecBlocksToDB()
+	// s := ConnectShardsToDB()
+	c := dao.client.DB(metabase).C(blocks)
+	s := dao.client.DB(metabase).C(shards)
 	var blocks []Block
 	var shards []Shard
 	var result []Block
@@ -183,8 +183,8 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 }
 
 //GetShardsByBlockIDAndVNF 根据blockid、VNF查shards表
-func (m DB) GetShardsByBlockIDAndVNF(g *gin.Context) {
-	c := ConnectShardsToDB()
+func (dao *Dao) GetShardsByBlockIDAndVNF(g *gin.Context) {
+	c := dao.client.DB(metabase).C(shards)
 	var result []Shard
 	blockIDStr := g.Query("blockID")
 	blockID, err := strconv.ParseInt(blockIDStr, 10, 64)
@@ -251,18 +251,18 @@ func BytesToInt64(bys []byte) int64 {
 }
 
 //ReceiveInfo 远程请求接收方返回test
-func (m DB) ReceiveInfo(g *gin.Context) {
-	c := ConnectRecieveBlocksToDB()
-	s := ConnectReceiveShardsToDB()
+func (dao *Dao) ReceiveInfo(g *gin.Context) {
+	c := dao.client.DB(metabase).C(blocks)
+	s := dao.client.DB(metabase).C(shards)
+	t := dao.client.DB(metabase).C(record)
 	// messages := Messages{}
 	var blocks []Block
 	record := Record{}
-	t := ConnectRecieveRecordToDB()
 	// c.Find(bson.M{"_id": i32,"poolOwner":poolOwner}).One(&node)
 	t.Find(bson.M{"sn": 0}).Sort("-1").Limit(1).One(&record)
 	fmt.Println("record查到最新的开始时间：", record.StartTime)
 	fmt.Println("record查到最新的结束时间：", record.EndTime)
-	time := conf.GetRecieveInfo("time")
+	time := dao.cfg.GetRecieveInfo("time")
 	start := strconv.Itoa(int(record.EndTime))
 	timee, err := strconv.Atoi(time)
 	end := strconv.Itoa(int(record.EndTime) + timee)
@@ -271,7 +271,7 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 	// client := &http.Client{}
 
 	//获取服务端的请求url
-	addrs := conf.GetRecieveInfo("addrs")
+	addrs := dao.cfg.GetRecieveInfo("addrs")
 
 	fmt.Println("addrs:::::", addrs)
 
@@ -315,9 +315,9 @@ func (m DB) ReceiveInfo(g *gin.Context) {
 }
 
 //CreateInitSyncRecord 创建初始同步记录
-func (m DB) CreateInitSyncRecord(g *gin.Context) {
-	start := conf.GetRecieveInfo("start")
-	time := conf.GetRecieveInfo("time")
+func (dao *Dao) CreateInitSyncRecord(g *gin.Context) {
+	start := dao.cfg.GetRecieveInfo("start")
+	time := dao.cfg.GetRecieveInfo("time")
 
 	min, err := strconv.ParseInt(start, 10, 32)
 	time32, err := strconv.ParseInt(time, 10, 32)
@@ -326,7 +326,7 @@ func (m DB) CreateInitSyncRecord(g *gin.Context) {
 	min32 := int32(min)
 	max32 := int32(max)
 
-	c := ConnectRecieveRecordToDB()
+	c := dao.client.DB(metabase).C(record)
 	for i := 0; i < 5; i++ {
 		record := Record{}
 		record.StartTime = min32
@@ -339,10 +339,10 @@ func (m DB) CreateInitSyncRecord(g *gin.Context) {
 }
 
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
-func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
-	c := ConnectRecieveBlocksToDB()
-	s := ConnectReceiveShardsToDB()
-	t := ConnectRecieveRecordToDB()
+func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
+	c := dao.client.DB(metabase).C(blocks)
+	s := dao.client.DB(metabase).C(shards)
+	t := dao.client.DB(metabase).C(record)
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
 
@@ -389,7 +389,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	// startTime, err := strconv.ParseInt(start, 10, 32)
 	entTime, err := strconv.ParseInt(end, 10, 32)
 	CheckErr(err)
-	time := conf.GetRecieveInfo("time")
+	time := dao.cfg.GetRecieveInfo("time")
 	time32, err := strconv.ParseInt(time, 10, 32)
 	min32 := int32(entTime)
 	max32 := int32(entTime) + int32(time32)
@@ -408,10 +408,13 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 }
 
 //RunService 启动线程函数
-func RunService(wg *sync.WaitGroup) {
+func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	fmt.Println("RunService.........")
-
-	sncount := conf.GetRecieveInfo("sncount")
+	dao, err := InitDao(cfg.GetRecieveInfo("url"), cfg)
+	if err != nil {
+		panic(err)
+	}
+	sncount := cfg.GetRecieveInfo("sncount")
 	countnum, err := strconv.ParseInt(sncount, 10, 32)
 
 	if err != nil {
@@ -421,13 +424,13 @@ func RunService(wg *sync.WaitGroup) {
 	var result []*Record
 	num := int(countnum)
 
-	c := ConnectRecieveRecordToDB()
+	c := dao.client.DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		r := new(Record)
 		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
 		result = append(result, r)
 	}
-	time := conf.GetRecieveInfo("time")
+	time := cfg.GetRecieveInfo("time")
 	time32, err := strconv.ParseInt(time, 10, 32)
 	for _, record := range result {
 		r := record
@@ -446,8 +449,8 @@ func RunService(wg *sync.WaitGroup) {
 					end = fmt.Sprintf("%d", r.EndTime)
 				}
 
-				addr := conf.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
-				insertBlocksAndShardsFromService(addr, start, end, r.Sn)
+				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
+				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
 				mm++
 			}
 			wg.Done()
