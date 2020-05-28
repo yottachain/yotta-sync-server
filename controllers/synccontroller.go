@@ -486,6 +486,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 
 //RunService 启动线程函数
 func RunService(wg sync.WaitGroup) {
+	fmt.Println("RunService.........")
 
 	sncount := conf.GetRecieveInfo("sncount")
 	countnum, err := strconv.ParseInt(sncount, 10, 32)

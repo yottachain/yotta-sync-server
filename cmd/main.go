@@ -39,8 +39,10 @@ func main() {
 	if err1 != nil {
 		panic(err1)
 	}
-	log.Info("strart ......")
+	log.Info("   strart ......")
+	fmt.Println("off" == service)
 	if service == "off" {
+		fmt.Println("Start Thread service ..............")
 		controllers.RunService(wg)
 		wg.Wait()
 	}
