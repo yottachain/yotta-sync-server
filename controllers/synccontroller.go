@@ -134,7 +134,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	max64 := BytesToInt64(maxdatas)
 	fmt.Println("min64:", min64)
 	fmt.Println("max64:", max64)
-	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).Sort("_id").All(&blocks)
+	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&blocks)
 	fmt.Println("blocks count::", len(blocks))
 	size := len(blocks) - 1
 
@@ -145,7 +145,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	shardMaxID := blockMaxID + int64(blockMaxVNF)
 	fmt.Println("min shard id:::", blockMinID)
 	fmt.Println("max shard id:::", shardMaxID)
-	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lt": shardMaxID}}).Sort("_id").All(&shards)
+	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
 	var num int
 	var count int
 	var ccc int
@@ -165,6 +165,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 
 		for i := 0; i < num; i++ {
 			// shards[count].BlockID = Block.ID
+			fmt.Println("count::::", count)
 			shardAll = append(shardAll, &shards[count])
 
 			count++
