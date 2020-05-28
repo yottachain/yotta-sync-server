@@ -480,7 +480,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 		record.EndTime = max32
 		record.Sn = sn
 		selector := bson.M{"sn": record.Sn}
-		data := bson.M{"start": record.StartTime, "end": record.EndTime}
+		data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
 		err3 := t.Update(selector, data)
 		if err3 != nil {
 			fmt.Println(err3)
