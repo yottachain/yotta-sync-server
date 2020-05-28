@@ -428,15 +428,16 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	s := ConnectReceiveShardsToDB()
 	t := ConnectRecieveRecordToDB()
 	var blocks []Block
-	addrs := conf.GetRecieveInfo(snAttrs)
-	fmt.Println("addrs:::::", addrs)
+	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
+	// addrs := conf.GetRecieveInfo(snAttrs)
+	// fmt.Println("addrs:::::", addrs)
 
 	//生成要访问的url
-	url := addrs + "/sync/get_blocks?start=" + start + "&end=" + end
+	url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
 
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("获取数据失败", addrs)
+		fmt.Println("获取数据失败", snAttrs)
 		return
 	}
 
@@ -485,7 +486,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 }
 
 //RunService 启动线程函数
-func RunService(wg sync.WaitGroup) {
+func RunService(wg *sync.WaitGroup) {
 	fmt.Println("RunService.........")
 
 	sncount := conf.GetRecieveInfo("sncount")

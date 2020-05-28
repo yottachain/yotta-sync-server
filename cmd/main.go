@@ -18,10 +18,17 @@ import (
 )
 
 func main() {
-	log.Info(time.Now().Format("2006-01-02 15:04:05") + "strart ......")
+	log.Info(time.Now().Format("2006-01-02 15:04:05") + " strart ......")
 	service := conf.GetRecieveInfo("service")
-
-	var wg sync.WaitGroup
+	log.Info("service::::::::", "off" == service)
+	log.Info("   strart ......")
+	fmt.Println("service::::::::", "off" == service)
+	if service == "off" {
+		wg := &sync.WaitGroup{}
+		fmt.Println("Start Thread service ..............")
+		controllers.RunService(wg)
+		wg.Wait()
+	}
 	flag.Parse()
 
 	cfg, err := ini.Load("../conf/yotta_config.yaml")
@@ -38,13 +45,6 @@ func main() {
 	err1 := router.Run(port)
 	if err1 != nil {
 		panic(err1)
-	}
-	log.Info("   strart ......")
-	fmt.Println("off" == service)
-	if service == "off" {
-		fmt.Println("Start Thread service ..............")
-		controllers.RunService(wg)
-		wg.Wait()
 	}
 
 }
@@ -71,5 +71,5 @@ func cronInit() {
 
 // 加个定时器
 func myfunc() {
-	fmt.Println("Hello,GoLang！！")
+	fmt.Println("Hello,Panda")
 }

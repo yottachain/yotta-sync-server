@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/yottachain/yotta-sync-server/utils"
@@ -44,7 +43,6 @@ func connectDB() (collection *mongo.Database) {
 	}
 	var dbName = utils.GetConf("mongo", "db")
 	collection = client.Database(dbName)
-	fmt.Println("Here.....")
 	return collection
 }
 
