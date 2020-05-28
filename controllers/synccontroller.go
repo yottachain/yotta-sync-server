@@ -154,7 +154,7 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 		s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
 
 		for m, Block := range blocks {
-			fmt.Println("Block ID------>M:", Block.ID)
+			// fmt.Println("Block ID------>M:", Block.ID)
 
 			var shardAll []*Shard
 			VNF := Block.VNF
@@ -164,12 +164,12 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 				ccc = num
 			} else {
 				ccc = ccc + num
-				fmt.Println("cccccccccc", ccc)
+				// fmt.Println("cccccccccc", ccc)
 			}
 
 			for i := 0; i < num; i++ {
 				// shards[count].BlockID = Block.ID
-				fmt.Println("count::::", count)
+				// fmt.Println("count::::", count)
 				shardAll = append(shardAll, &shards[count])
 
 				count++
