@@ -419,7 +419,7 @@ func (m DB) CreateInitSyncRecord(g *gin.Context) {
 		c.Insert(&record)
 	}
 
-	g.String(200, "tttteseeeess")
+	g.String(200, "初始化record表")
 }
 
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record

@@ -11,12 +11,15 @@ import (
 	"github.com/go-ini/ini"
 	"github.com/prometheus/common/log"
 	"github.com/robfig/cron"
+	"github.com/yottachain/yotta-sync-server/conf"
+	"github.com/yottachain/yotta-sync-server/controllers"
 	"github.com/yottachain/yotta-sync-server/routers"
 	"github.com/yottachain/yotta-sync-server/utils"
 )
 
 func main() {
 	log.Info(time.Now().Format("2006-01-02 15:04:05") + "strart ......")
+	service := conf.GetRecieveInfo("service")
 
 	var wg sync.WaitGroup
 	flag.Parse()
@@ -37,8 +40,11 @@ func main() {
 		panic(err1)
 	}
 	log.Info("strart ......")
-	RunService(wg)
-	wg.Wait()
+	if service == "off" {
+		controllers.RunService(wg)
+		wg.Wait()
+	}
+
 }
 
 var commands = map[string]string{
