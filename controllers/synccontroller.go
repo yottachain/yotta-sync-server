@@ -135,7 +135,7 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	fmt.Println("min64:", min64)
 	fmt.Println("max64:", max64)
 	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&blocks)
-	fmt.Println("blocks count::", len(blocks))
+	// fmt.Println("blocks count::", len(blocks))
 	size := len(blocks) - 1
 
 	//此时间单位内最小的分片ID 和分块ID一样
