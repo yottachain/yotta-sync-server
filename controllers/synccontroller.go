@@ -135,7 +135,7 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	fmt.Println("min64:", min64)
 	fmt.Println("max64:", max64)
 	c.Find(bson.M{"_id": bson.M{"$lt": max64, "$gte": min64}}).Sort("_id").All(&blocks)
-	fmt.Println("多少条", len(blocks))
+	fmt.Println("blocks count::", len(blocks))
 	size := len(blocks) - 1
 
 	//此时间单位内最小的分片ID 和分块ID一样
@@ -150,16 +150,15 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 	var count int
 	var ccc int
 	for m, Block := range blocks {
-		fmt.Println("分块ID---->M:", Block.ID)
+		fmt.Println("Block ID------>M:", Block.ID)
 
 		var shardAll []*Shard
 		VNF := Block.VNF
 		num = int(VNF)
 		if m == 0 {
-			fmt.Println("第一个分片ID:", shards[m].ID)
+			fmt.Println("First Shard ID:", shards[m].ID)
 			ccc = num
 		} else {
-			fmt.Println("第m个分块：", m, " 第m个分块的第一个分片id:", shards[ccc].ID)
 			ccc = ccc + num
 			fmt.Println("cccccccccc", ccc)
 		}
@@ -174,8 +173,8 @@ func (m DB) GetBlocksByTimes(g *gin.Context) {
 		result = append(result, Block)
 	}
 
-	fmt.Println("本次共查询到的分块数量为 ： ", len(blocks))
-	fmt.Println("本次共查询到的分片数量为 ： ", len(shards))
+	fmt.Println("blocks total counts : ", len(blocks))
+	fmt.Println("Shards total counts : ", len(shards))
 	g.JSON(200, result)
 }
 
@@ -204,7 +203,7 @@ func (m DB) GetShardsByBlockIDAndVNF(g *gin.Context) {
 		}
 	}
 
-	fmt.Println("Block:", blockID, " 共有 ", len(result), " 个分片")
+	fmt.Println("Block:", blockID, " Shards Total count ", len(result), " shards")
 	g.JSON(200, result)
 }
 
@@ -437,7 +436,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("获取数据失败", snAttrs)
+		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
 		return
 	}
 
@@ -457,7 +456,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 		err1 := c.Insert(&b)
 		if err1 != nil {
 			fmt.Println(err1)
-			fmt.Println("接收服务器插入Block错误，BlockID:", bb.ID)
+			fmt.Println("Insert Block error，BlockID:", bb.ID)
 		}
 		for _, ss := range bb.Shards {
 			items = append(items, ss)
@@ -465,7 +464,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 		err2 := s.Insert(items...)
 		if err2 != nil {
 			fmt.Println(err2)
-			fmt.Println("接收服务器批量插入分片错误，所属块ID:", bb.ID)
+			fmt.Println("Insert shards error，blockID:", bb.ID)
 		}
 		record := Record{}
 		startTime, err := strconv.ParseInt(start, 10, 32)
@@ -480,7 +479,7 @@ func insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 		err3 := t.Insert(&record)
 		if err3 != nil {
 			fmt.Println(err3)
-			fmt.Println("时间段开始时间：", start, "结束时间：", end, "同步的sn: sn", sn, "此时间段内同步完成进入下一时间段")
+			fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 		}
 	}
 }
