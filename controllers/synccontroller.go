@@ -136,20 +136,23 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	fmt.Println("max64:", max64)
 	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&blocks)
 	// fmt.Println("blocks count::", len(blocks))
-	size := len(blocks) - 1
 
-	//此时间单位内最小的分片ID 和分块ID一样
-	blockMinID := blocks[0].ID
-	blockMaxID := blocks[size].ID
-	blockMaxVNF := blocks[size].VNF - 1
-	shardMaxID := blockMaxID + int64(blockMaxVNF)
-	fmt.Println("min shard id:::", blockMinID)
-	fmt.Println("max shard id:::", shardMaxID)
-	s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
 	var num int
 	var count int
 	var ccc int
 	if len(blocks) > 0 {
+
+		size := len(blocks) - 1
+
+		//此时间单位内最小的分片ID 和分块ID一样
+		blockMinID := blocks[0].ID
+		blockMaxID := blocks[size].ID
+		blockMaxVNF := blocks[size].VNF - 1
+		shardMaxID := blockMaxID + int64(blockMaxVNF)
+		fmt.Println("min shard id:::", blockMinID)
+		fmt.Println("max shard id:::", shardMaxID)
+		s.Find(bson.M{"_id": bson.M{"$gte": blockMinID, "$lte": shardMaxID}}).Sort("_id").All(&shards)
+
 		for m, Block := range blocks {
 			fmt.Println("Block ID------>M:", Block.ID)
 
