@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	cfg, err := conf.CreateConfig("../conf/yotta_config.yaml")
+	cfg, err := conf.CreateConfig("../conf/yotta_config.ini")
 	if err != nil {
 		panic(err)
 	}
