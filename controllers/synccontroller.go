@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/yottachain/yotta-sync-server/conf"
@@ -433,8 +434,8 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
 		result = append(result, r)
 	}
-	time := cfg.GetRecieveInfo("time")
-	time32, err := strconv.ParseInt(time, 10, 32)
+	timec := cfg.GetRecieveInfo("time")
+	time32, err := strconv.ParseInt(timec, 10, 32)
 	for _, record := range result {
 		r := record
 		go func() {
@@ -452,6 +453,11 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 					end = fmt.Sprintf("%d", r.EndTime)
 				}
 
+				now1 := time.Now().Unix()
+				if now1 < int64(r.EndTime) {
+					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+					time.Sleep(time.Minute * 10)
+				}
 				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
 				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
 				mm++
