@@ -16,100 +16,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-//DB 定义mongo连接
-// type DB struct {
-// 	Mgo *mongo.Database
-// }
-
-// 根据文件名，段名，键名获取ini的值
-// func getValue(expectKey string) string {
-// 	cfg, err := ini.Load("../conf/yotta_config.yaml")
-
-// 	if err == nil {
-
-// 	}
-// 	url := cfg.Section("mongo").Key(expectKey).String()
-// 	fmt.Println("url:::", url)
-// 	return url
-// }
-
-//ConnecBlocksToDB 查询用户表
-// func (dao *Dao) ConnecBlocksToDB() *mgo.Collection {
-
-// 	url := conf.GetConfigInfo("url")
-// 	db := conf.GetConfigInfo("db")
-// 	fmt.Println("db.....", db)
-// 	fmt.Println("url.....", url)
-// 	session, err := mgo.Dial(url)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	//defer session.Close()
-// 	session.SetMode(mgo.Monotonic, true)
-// 	c := session.DB(db).C("blocks")
-// 	return c
-// }
-
-// //ConnectRecieveBlocksToDB 连接接收端数据库 block
-// func ConnectRecieveBlocksToDB() *mgo.Collection {
-// 	url := conf.GetRecieveInfo("url")
-// 	db := conf.GetRecieveInfo("db")
-// 	fmt.Println("receive db.....", db)
-// 	fmt.Println("receive url.....", url)
-// 	session, err := mgo.Dial(url)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	//defer session.Close()
-// 	session.SetMode(mgo.Monotonic, true)
-// 	c := session.DB(db).C("blocks")
-// 	return c
-// }
-
-// //ConnectRecieveRecordToDB 连接接收端数据库 block
-// func ConnectRecieveRecordToDB() *mgo.Collection {
-// 	url := conf.GetRecieveInfo("url")
-// 	db := conf.GetRecieveInfo("db")
-// 	fmt.Println("receive db.....", db)
-// 	fmt.Println("receive url.....", url)
-// 	session, err := mgo.Dial(url)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	//defer session.Close()
-// 	session.SetMode(mgo.Monotonic, true)
-// 	c := session.DB(db).C("record")
-// 	return c
-// }
-
-// // ConnectShardsToDB 连接Shard表
-// func ConnectShardsToDB() *mgo.Collection {
-// 	session, err := mgo.Dial(conf.GetConfigInfo("url"))
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	//defer session.Close()
-// 	session.SetMode(mgo.Monotonic, true)
-// 	c := session.DB(conf.GetConfigInfo("db")).C("shards")
-// 	return c
-// }
-
-// //ConnectReceiveShardsToDB 连接接收端Shard表
-// func ConnectReceiveShardsToDB() *mgo.Collection {
-// 	session, err := mgo.Dial(conf.GetRecieveInfo("url"))
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	//defer session.Close()
-// 	session.SetMode(mgo.Monotonic, true)
-// 	c := session.DB(conf.GetRecieveInfo("db")).C("shards")
-// 	return c
-// }
-
-//GetBlocksByTimes 按时间段查询blocks表
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
-	// c := ConnecBlocksToDB()
-	// s := ConnectShardsToDB()
+
 	c := dao.client.DB(metabase).C(blocks)
 	s := dao.client.DB(metabase).C(shards)
 	var blocks []Block
@@ -368,7 +276,6 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	if len(blocks) > 0 {
 		for _, bb := range blocks {
 			var items []interface{}
-			// fmt.Println("blockssdsfjsjkdfs", bb.ID)
 			b := Block{}
 			b.ID = bb.ID
 			b.AR = bb.AR
@@ -379,6 +286,7 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 				fmt.Println("Insert Block error，BlockID:", bb.ID)
 			}
 			for _, ss := range bb.Shards {
+				ss.BlockID = b.ID
 				items = append(items, ss)
 			}
 			err2 := s.Insert(items...)
