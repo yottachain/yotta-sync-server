@@ -17,9 +17,10 @@ import (
 )
 
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
+	metabase_db := dao.cfg.GetConfigInfo("db")
 
-	c := dao.client.DB(metabase).C(blocks)
-	s := dao.client.DB(metabase).C(shards)
+	c := dao.client.DB(metabase_db).C(blocks)
+	s := dao.client.DB(metabase_db).C(shards)
 	var blocks []Block
 	var shards []Shard
 	var result []Block
