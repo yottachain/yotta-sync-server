@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/yottachain/yotta-sync-server/conf"
@@ -20,6 +21,7 @@ type Dao struct {
 }
 
 func InitDao(mongoURL string, cfg *conf.Config) (*Dao, error) {
+	fmt.Println("mongoURL::::", mongoURL)
 	session, err := mgo.Dial(mongoURL)
 	// cli, err := mongo.Connect(context.Background(), options.Client().ApplyURI(mongoURL))
 	if err != nil {

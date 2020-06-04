@@ -29,18 +29,12 @@ func main() {
 	if service == "off" {
 		wg := &sync.WaitGroup{}
 		fmt.Println("Start Thread service ..............")
+
 		controllers.RunService(wg, cfg)
 		wg.Wait()
 		return
 	}
 	flag.Parse()
-
-	// cfg, err := ini.Load("../conf/yotta_config.yaml")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// utils.Config = cfg
 
 	router := routers.InitRouter(cfg)
 	// cronInit()

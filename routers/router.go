@@ -1,6 +1,8 @@
 package routers
 
 import (
+	"strconv"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/yottachain/yotta-sync-server/conf"
@@ -18,13 +20,26 @@ func InitRouter(cfg *conf.Config) (router *gin.Engine) {
 	if err != nil {
 		panic(err)
 	}
+	service := cfg.GetRecieveInfo("service")
+
+	if service == "off" {
+		start := cfg.GetRecieveInfo("start")
+		interval := cfg.GetRecieveInfo("time")
+		sncount := cfg.GetRecieveInfo("sncount")
+		countnum, err := strconv.ParseInt(sncount, 10, 32)
+		if err != nil {
+		}
+		num := int(countnum)
+		controllers.CreateInitRecord(start, interval, num, dao)
+	}
+
 	v1 := router.Group("/sync")
 	{
 		{
 			v1.GET("/get_blocks", dao.GetBlocksByTimes)
 			v1.GET("/get_shards", dao.GetShardsByBlockIDAndVNF)
 			v1.GET("/get_receive", dao.ReceiveInfo)
-			v1.GET("/createInitRecord", dao.CreateInitSyncRecord)
+			// v1.GET("/createInitRecord", dao.CreateInitSyncRecord)
 		}
 	}
 

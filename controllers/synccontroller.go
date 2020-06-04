@@ -228,27 +228,57 @@ func (dao *Dao) ReceiveInfo(g *gin.Context) {
 }
 
 //CreateInitSyncRecord 创建初始同步记录
-func (dao *Dao) CreateInitSyncRecord(g *gin.Context) {
-	start := dao.cfg.GetRecieveInfo("start")
-	time := dao.cfg.GetRecieveInfo("time")
+// func (dao *Dao) CreateInitSyncRecord(g *gin.Context) {
+// 	start := dao.cfg.GetRecieveInfo("start")
+// 	interval := dao.cfg.GetRecieveInfo("time")
+
+// 	min, err := strconv.ParseInt(start, 10, 32)
+// 	time32, err := strconv.ParseInt(interval, 10, 32)
+// 	max := min + time32
+// 	CheckErr(err)
+// 	min32 := int32(min)
+// 	max32 := int32(max)
+
+// 	c := dao.client.DB(metabase).C(record)
+// 	for i := 0; i < 5; i++ {
+// 		record := Record{}
+// 		record.StartTime = min32
+// 		record.EndTime = max32
+// 		record.Sn = i
+// 		c.Insert(&record)
+// 	}
+
+// 	g.String(200, "初始化record表")
+// }
+
+//CreateInitRecord 创建初始同步记录
+func CreateInitRecord(start, interval string, num int, dao *Dao) {
+	// start := dao.cfg.GetRecieveInfo("start")
+	// interval := dao.cfg.GetRecieveInfo("time")
 
 	min, err := strconv.ParseInt(start, 10, 32)
-	time32, err := strconv.ParseInt(time, 10, 32)
+	time32, err := strconv.ParseInt(interval, 10, 32)
 	max := min + time32
 	CheckErr(err)
 	min32 := int32(min)
 	max32 := int32(max)
 
 	c := dao.client.DB(metabase).C(record)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < num; i++ {
 		record := Record{}
+		recordOld := Record{}
 		record.StartTime = min32
 		record.EndTime = max32
 		record.Sn = i
-		c.Insert(&record)
+		c.Find(bson.M{"sn": record.Sn}).Sort("-1").Limit(1).One(&recordOld)
+		if recordOld.Sn != record.Sn {
+			fmt.Println("Init record table ...")
+			c.Insert(&record)
+			fmt.Println("Init data add complete...")
+		}
+
 	}
 
-	g.String(200, "初始化record表")
 }
 
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
@@ -329,6 +359,8 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	}
 	sncount := cfg.GetRecieveInfo("sncount")
 	countnum, err := strconv.ParseInt(sncount, 10, 32)
+	sleetTime1 := cfg.GetRecieveInfo("sleep")
+	sleepTime2, err := strconv.ParseInt(sleetTime1, 10, 32)
 
 	if err != nil {
 
@@ -362,10 +394,15 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 					end = fmt.Sprintf("%d", r.EndTime)
 				}
 
-				now1 := time.Now().Unix()
+				delayTime1 := cfg.GetRecieveInfo("delayTime")
+				delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
+				if err != nil {
+				}
+				now1 := time.Now().Unix() - delayTime
 				if now1 < int64(r.EndTime) {
 					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
-					time.Sleep(time.Minute * 10)
+					sleepTime := time.Duration(sleepTime2)
+					time.Sleep(time.Minute * sleepTime)
 				}
 				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
 				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
