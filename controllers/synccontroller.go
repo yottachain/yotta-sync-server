@@ -270,9 +270,9 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 		record.StartTime = min32
 		record.EndTime = max32
 		record.Sn = i
-		c.Find(bson.M{"sn": record.Sn}).Sort("-1").Limit(1).One(&recordOld)
-		if recordOld.Sn != record.Sn {
-			fmt.Println("Init record table ...")
+		c.Find(bson.M{"sn": i}).One(&recordOld)
+		if recordOld.StartTime == 0 {
+			fmt.Println("Init record table ...", record.Sn)
 			c.Insert(&record)
 			fmt.Println("Init data add complete...")
 		}

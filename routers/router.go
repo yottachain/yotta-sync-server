@@ -1,7 +1,9 @@
 package routers
 
 import (
+	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -10,7 +12,7 @@ import (
 )
 
 //InitRouter 初始化路由
-func InitRouter(cfg *conf.Config) (router *gin.Engine) {
+func InitRouter(cfg *conf.Config, wg *sync.WaitGroup) (router *gin.Engine) {
 	router = gin.Default()
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
@@ -31,6 +33,14 @@ func InitRouter(cfg *conf.Config) (router *gin.Engine) {
 		}
 		num := int(countnum)
 		controllers.CreateInitRecord(start, interval, num, dao)
+
+		wg := &sync.WaitGroup{}
+		fmt.Println("Start Thread service ..............")
+
+		controllers.RunService(wg, cfg)
+		wg.Wait()
+		return
+
 	}
 
 	v1 := router.Group("/sync")

@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/common/log"
 	"github.com/robfig/cron"
 	"github.com/yottachain/yotta-sync-server/conf"
-	"github.com/yottachain/yotta-sync-server/controllers"
 	"github.com/yottachain/yotta-sync-server/routers"
 )
 
@@ -26,17 +25,10 @@ func main() {
 	log.Info("service::::::::", "off" == service)
 	log.Info("   start ......")
 	fmt.Println("service::::::::", "off" == service)
-	if service == "off" {
-		wg := &sync.WaitGroup{}
-		fmt.Println("Start Thread service ..............")
 
-		controllers.RunService(wg, cfg)
-		wg.Wait()
-		return
-	}
 	flag.Parse()
-
-	router := routers.InitRouter(cfg)
+	wg := &sync.WaitGroup{}
+	router := routers.InitRouter(cfg, wg)
 	// cronInit()
 
 	port := cfg.GetHTTPInfo("port")
@@ -44,6 +36,15 @@ func main() {
 	if err1 != nil {
 		panic(err1)
 	}
+
+	// if service == "off" {
+	// 	wg := &sync.WaitGroup{}
+	// 	fmt.Println("Start Thread service ..............")
+
+	// 	controllers.RunService(wg, cfg)
+	// 	wg.Wait()
+	// 	return
+	// }
 
 }
 
