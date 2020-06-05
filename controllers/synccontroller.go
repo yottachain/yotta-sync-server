@@ -383,6 +383,18 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 			mm := 0
 			for num > 0 {
 				fmt.Println("Goroutine ", r.Sn)
+				delayTime1 := cfg.GetRecieveInfo("delayTime")
+				delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
+				if err != nil {
+				}
+				now1 := time.Now().Unix() - delayTime
+				if now1 < int64(r.EndTime) {
+					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+
+					sleepTime := time.Duration(sleepTime2)
+					fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", sleepTime, " 分钟后")
+					time.Sleep(time.Minute * sleepTime)
+				}
 				var start string
 				var end string
 				if mm == 0 {
@@ -394,16 +406,6 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 					end = fmt.Sprintf("%d", r.EndTime)
 				}
 
-				delayTime1 := cfg.GetRecieveInfo("delayTime")
-				delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
-				if err != nil {
-				}
-				now1 := time.Now().Unix() - delayTime
-				if now1 < int64(r.EndTime) {
-					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
-					sleepTime := time.Duration(sleepTime2)
-					time.Sleep(time.Minute * sleepTime)
-				}
 				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
 				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
 				mm++
