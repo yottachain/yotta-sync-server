@@ -16,6 +16,19 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+func (dao *Dao) GetTimeStamp(g *gin.Context) {
+	blockID := g.Query("blockID")
+	fmt.Println("blockID::::::::::", blockID)
+	block64, err := strconv.ParseInt(blockID, 10, 64)
+
+	CheckErr(err)
+	byteBlockID32 := Int64ToBytes(block64)[:4]
+
+	blockID32 := BytesToInt32(byteBlockID32)
+	timeStamp := fmt.Sprintf("%d", blockID32)
+	g.String(200, "时间戳："+timeStamp)
+}
+
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	metabase_db := dao.cfg.GetConfigInfo("db")
 
@@ -305,6 +318,7 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 		err = json.Unmarshal(body, &blocks)
 	}
 	if len(blocks) > 0 {
+		fmt.Println("startBlockID:", start, "endBlockID", end, "SN:", sn, "Block counts:", len(blocks))
 		for _, bb := range blocks {
 			var items []interface{}
 			b := Block{}
@@ -332,8 +346,8 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	// startTime, err := strconv.ParseInt(start, 10, 32)
 	entTime, err := strconv.ParseInt(end, 10, 32)
 	CheckErr(err)
-	time := dao.cfg.GetRecieveInfo("time")
-	time32, err := strconv.ParseInt(time, 10, 32)
+	time1 := dao.cfg.GetRecieveInfo("time")
+	time32, err := strconv.ParseInt(time1, 10, 32)
 	min32 := int32(entTime)
 	max32 := int32(entTime) + int32(time32)
 
