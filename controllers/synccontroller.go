@@ -310,8 +310,6 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
 		return
 	}
-
-	fmt.Println("url::::", url)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err == nil {
@@ -319,34 +317,38 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	}
 	if len(blocks) > 0 {
 		fmt.Println("startBlockID:", start, "endBlockID", end, "SN:", sn, "Block counts:", len(blocks))
+		var itemsBlocks []interface{}
+		for _, b := range blocks {
+			n := Block{}
+			n.ID = b.ID
+			n.AR = b.AR
+			n.VNF = b.VNF
+			itemsBlocks = append(itemsBlocks, n)
+		}
+		errB := c.Insert(itemsBlocks...)
+		if errB != nil {
+			fmt.Println("Insert Blocks error")
+			// return
+		}
+		var items []interface{}
 		for _, bb := range blocks {
-			var items []interface{}
 			b := Block{}
 			b.ID = bb.ID
 			b.AR = bb.AR
 			b.VNF = bb.VNF
-			err1 := c.Insert(&b)
-			if err1 != nil {
 
-				end = start
-				fmt.Println(err1)
-				fmt.Println("Insert Block error，BlockID:", bb.ID)
-				// CheckErr(err1)
-			}
 			for _, ss := range bb.Shards {
 				ss.BlockID = b.ID
 				items = append(items, ss)
 			}
-			err2 := s.Insert(items...)
-			if err2 != nil {
-				fmt.Println(err2)
-				fmt.Println("Insert shards error，blockID:", bb.ID)
-			}
 
+		}
+		errS := s.Insert(items...)
+		if errS != nil {
+			fmt.Println(errS)
 		}
 	}
 	record := Record{}
-	// startTime, err := strconv.ParseInt(start, 10, 32)
 	entTime, err3 := strconv.ParseInt(end, 10, 32)
 	CheckErr(err3)
 	time1 := dao.cfg.GetRecieveInfo("time")
