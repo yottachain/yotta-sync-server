@@ -327,8 +327,11 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 			b.VNF = bb.VNF
 			err1 := c.Insert(&b)
 			if err1 != nil {
+
+				end = start
 				fmt.Println(err1)
 				fmt.Println("Insert Block error，BlockID:", bb.ID)
+				// CheckErr(err1)
 			}
 			for _, ss := range bb.Shards {
 				ss.BlockID = b.ID
@@ -344,10 +347,11 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	}
 	record := Record{}
 	// startTime, err := strconv.ParseInt(start, 10, 32)
-	entTime, err := strconv.ParseInt(end, 10, 32)
-	CheckErr(err)
+	entTime, err3 := strconv.ParseInt(end, 10, 32)
+	CheckErr(err3)
 	time1 := dao.cfg.GetRecieveInfo("time")
-	time32, err := strconv.ParseInt(time1, 10, 32)
+	time32, err4 := strconv.ParseInt(time1, 10, 32)
+	CheckErr(err4)
 	min32 := int32(entTime)
 	max32 := int32(entTime) + int32(time32)
 
@@ -356,9 +360,9 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	record.Sn = sn
 	selector := bson.M{"sn": record.Sn}
 	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
-	err3 := t.Update(selector, data)
-	if err3 != nil {
-		fmt.Println(err3)
+	err5 := t.Update(selector, data)
+	if err5 != nil {
+		fmt.Println(err5)
 	}
 	fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 
