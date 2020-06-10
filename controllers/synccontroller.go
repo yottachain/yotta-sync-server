@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ivpusic/grpool"
 	"github.com/yottachain/yotta-sync-server/conf"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -381,14 +381,11 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	countnum, err := strconv.ParseInt(sncount, 10, 32)
 	sleetTime1 := cfg.GetRecieveInfo("sleep")
 	sleepTime2, err := strconv.ParseInt(sleetTime1, 10, 32)
-
 	if err != nil {
 
 	}
-
 	var result []*Record
 	num := int(countnum)
-
 	c := dao.client.DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		r := new(Record)
@@ -397,41 +394,61 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	}
 	timec := cfg.GetRecieveInfo("time")
 	time32, err := strconv.ParseInt(timec, 10, 32)
+
 	for _, record := range result {
-		r := record
-		go func() {
-			mm := 0
-			for num > 0 {
-				fmt.Println("Goroutine ", r.Sn)
-				delayTime1 := cfg.GetRecieveInfo("delayTime")
-				delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
-				if err != nil {
-				}
-				now1 := time.Now().Unix() - delayTime
-				if now1 < int64(r.EndTime) {
-					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+		re := record
+		var executor Executor
+		addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", re.Sn))
+		executor.AddURL = addr
+		executor.TimeC = int(time32)
+		executor.SleepTime = int(sleepTime2)
+		executor.Snid = re.Sn
 
-					sleepTime := time.Duration(sleepTime2)
-					fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", sleepTime, " 分钟后")
-					time.Sleep(time.Minute * sleepTime)
-				}
-				var start string
-				var end string
-				if mm == 0 {
-					start = fmt.Sprintf("%d", r.EndTime)
-					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
-				} else {
-					c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
-					start = fmt.Sprintf("%d", r.StartTime)
-					end = fmt.Sprintf("%d", r.EndTime)
-				}
-
-				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
-				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
-				mm++
-			}
-			wg.Done()
-		}()
-		wg.Add(1)
+		pool := grpool.NewPool(10, 0)
+		executor.Pool = pool
+		executor.dao = dao
+		// executor.InitPoolTask()
+		go executor.start(addr, executor.Snid)
 	}
+
+	// for _, record := range result {
+	// 	r := record
+	// 	var ex Executor
+	// 	go func() {
+	// 		mm := 0
+	// 		for num > 0 {
+	// 			fmt.Println("Goroutine ", r.Sn)
+	// 			delayTime1 := cfg.GetRecieveInfo("delayTime")
+	// 			delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
+	// 			if err != nil {
+	// 			}
+	// 			now1 := time.Now().Unix() - delayTime
+	// 			if now1 < int64(r.EndTime) {
+	// 				// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+
+	// 				sleepTime := time.Duration(sleepTime2)
+	// 				fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", sleepTime, " 分钟后")
+	// 				time.Sleep(time.Minute * sleepTime)
+	// 			}
+	// 			var start string
+	// 			var end string
+	// 			if mm == 0 {
+	// 				start = fmt.Sprintf("%d", r.EndTime)
+	// 				end = fmt.Sprintf("%d", r.EndTime+int32(time32))
+	// 			} else {
+	// 				c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
+	// 				start = fmt.Sprintf("%d", r.StartTime)
+	// 				end = fmt.Sprintf("%d", r.EndTime)
+	// 			}
+
+	// 			addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
+	// 			ex.PullBlocksAndShardsByTimes(addr, start, end, r.Sn, dao)
+	// 			// dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
+
+	// 			mm++
+	// 		}
+	// 		wg.Done()
+	// 	}()
+	// 	wg.Add(1)
+	// }
 }
