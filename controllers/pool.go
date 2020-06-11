@@ -95,8 +95,8 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		executor.Pool.JobQueue <- func() {
 			bs := executor.blocks
 			// var bs []Block
-			// executor.InsertBlockAndShard(bs)
-			executor.saveBlocksToFile(start, executor.Snid, bs)
+			executor.InsertBlockAndShard(bs)
+			// executor.saveBlocksToFile(start, executor.Snid, bs)
 		}
 		fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
 		record := Record{}
