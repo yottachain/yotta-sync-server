@@ -163,7 +163,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 // saveBlocksToFile 将拉取的数据保存到本地
 func (executor *Executor) saveBlocksToFile(start string, snID int, blocks []Block) {
 	//创建或者打开文件
-	path := "/mnt/" + fmt.Sprintf("%d", snID) + "/" + start
+	path := "/data/sn/" + fmt.Sprintf("%d", snID) + "/" + start
 	file, e := os.Create(path)
 	if e != nil {
 		fmt.Println("创建文件失败！", e)
