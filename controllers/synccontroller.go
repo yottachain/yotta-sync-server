@@ -410,6 +410,12 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 		// executor.InitPoolTask()
 		go executor.start(addr, executor.Snid)
 	}
+	// for _, record := range result {
+	// 	re := record
+	// 	var executor Executor
+	// 	addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", re.Sn))
+
+	// }
 
 	// for _, record := range result {
 	// 	r := record

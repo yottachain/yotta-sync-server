@@ -88,13 +88,13 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		if err == nil {
 			err = json.Unmarshal(body, &blocks)
 		}
-
-		executor.blocks = blocks
-		executor.Pool.JobQueue <- func() {
-			bs := executor.blocks
-			// var bs []Block
-			executor.InsertBlockAndShard(bs)
-		}
+		// 屏蔽写表功能
+		// executor.blocks = blocks
+		// executor.Pool.JobQueue <- func() {
+		// 	bs := executor.blocks
+		// 	// var bs []Block
+		// 	executor.InsertBlockAndShard(bs)
+		// }
 		fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 		record := Record{}
 		entTime, err3 := strconv.ParseInt(end, 10, 32)
