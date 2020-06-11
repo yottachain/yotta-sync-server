@@ -89,12 +89,12 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 			err = json.Unmarshal(body, &blocks)
 		}
 		// 屏蔽写表功能
-		// executor.blocks = blocks
-		// executor.Pool.JobQueue <- func() {
-		// 	bs := executor.blocks
-		// 	// var bs []Block
-		// 	executor.InsertBlockAndShard(bs)
-		// }
+		executor.blocks = blocks
+		executor.Pool.JobQueue <- func() {
+			bs := executor.blocks
+			// var bs []Block
+			executor.InsertBlockAndShard(bs)
+		}
 		fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 		record := Record{}
 		entTime, err3 := strconv.ParseInt(end, 10, 32)
@@ -120,7 +120,7 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 }
 
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
-	fmt.Println("*********************************************")
+	// fmt.Println("*********************************************")
 	c := executor.dao.client.DB(metabase).C("blocks")
 	s := executor.dao.client.DB(metabase).C("shards")
 	if len(blocks) > 0 {

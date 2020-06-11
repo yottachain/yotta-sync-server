@@ -394,7 +394,9 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	}
 	timec := cfg.GetRecieveInfo("time")
 	time32, err := strconv.ParseInt(timec, 10, 32)
-
+	coroutinesNumber1 := cfg.GetRecieveInfo("coroutinesNumber")
+	coroutinesNumber32, err := strconv.ParseInt(coroutinesNumber1, 10, 32)
+	coroutinesNumber := int(coroutinesNumber32)
 	for _, record := range result {
 		re := record
 		var executor Executor
@@ -403,8 +405,7 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 		executor.TimeC = int(time32)
 		executor.SleepTime = int(sleepTime2)
 		executor.Snid = re.Sn
-
-		pool := grpool.NewPool(10, 0)
+		pool := grpool.NewPool(coroutinesNumber, 0)
 		executor.Pool = pool
 		executor.dao = dao
 		// executor.InitPoolTask()
