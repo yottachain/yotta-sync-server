@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -88,14 +89,16 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		if err == nil {
 			err = json.Unmarshal(body, &blocks)
 		}
+
 		// 屏蔽写表功能
 		executor.blocks = blocks
 		executor.Pool.JobQueue <- func() {
 			bs := executor.blocks
 			// var bs []Block
-			executor.InsertBlockAndShard(bs)
+			// executor.InsertBlockAndShard(bs)
+			executor.saveBlocksToFile(start, executor.Snid, bs)
 		}
-		fmt.Println("blocks len:::::::::::::::::::", len(blocks))
+		fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
 		record := Record{}
 		entTime, err3 := strconv.ParseInt(end, 10, 32)
 		CheckErr(err3)
@@ -155,4 +158,24 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			fmt.Println(errS)
 		}
 	}
+}
+
+// saveBlocksToFile 将拉取的数据保存到本地
+func (executor *Executor) saveBlocksToFile(start string, snID int, blocks []Block) {
+	//创建或者打开文件
+	path := "/mnt/" + fmt.Sprintf("%d", snID) + "/" + start
+	file, e := os.Create(path)
+	if e != nil {
+		fmt.Println("创建文件失败！", e)
+	}
+
+	//生成文件编码器
+	encoder := json.NewEncoder(file)
+	//使用编码器将结构体编码到文件中
+	encode := encoder.Encode(blocks)
+	if encode != nil {
+		fmt.Println("blocks写入文件失败！")
+	}
+	file.Close()
+
 }
