@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -57,7 +58,7 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 	for num > 0 {
 
 		fmt.Println("Goroutine ", sn)
-		t := executor.dao.client.DB("metabase").C("record")
+		t := executor.dao.client[0].DB("metabase").C("record")
 		r := new(Record)
 		t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 		start := fmt.Sprintf("%d", r.StartTime)
@@ -124,8 +125,9 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 	// fmt.Println("*********************************************")
-	c := executor.dao.client.DB(metabase).C("blocks")
-	s := executor.dao.client.DB(metabase).C("shards")
+	r := rand.Intn(len(executor.dao.client))
+	c := executor.dao.client[r].DB(metabase).C("blocks")
+	s := executor.dao.client[r].DB(metabase).C("shards")
 	if len(blocks) > 0 {
 		var itemsBlocks []interface{}
 		for _, b := range blocks {

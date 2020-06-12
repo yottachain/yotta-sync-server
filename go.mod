@@ -9,6 +9,8 @@ require (
 	github.com/ivpusic/grpool v1.0.0
 	github.com/prometheus/common v0.10.0
 	github.com/robfig/cron v1.2.0
+	github.com/smartystreets/goconvey v1.6.4 // indirect
 	go.mongodb.org/mongo-driver v1.3.3
+	gopkg.in/ini.v1 v1.57.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 )
