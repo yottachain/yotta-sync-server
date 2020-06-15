@@ -6,15 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ivpusic/grpool"
 	"github.com/yottachain/yotta-sync-server/conf"
 	"gopkg.in/mgo.v2/bson"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func (dao *Dao) GetTimeStamp(g *gin.Context) {
 	blockID := g.Query("blockID")
@@ -32,8 +38,9 @@ func (dao *Dao) GetTimeStamp(g *gin.Context) {
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	metabase_db := dao.cfg.GetConfigInfo("db")
 
-	c := dao.client.DB(metabase_db).C(blocks)
-	s := dao.client.DB(metabase_db).C(shards)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase_db).C(blocks)
+	s := dao.client[r].DB(metabase_db).C(shards)
 	var blocks []Block
 	var shards []Shard
 	var result []Block
@@ -110,7 +117,8 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 
 //GetShardsByBlockIDAndVNF 根据blockid、VNF查shards表
 func (dao *Dao) GetShardsByBlockIDAndVNF(g *gin.Context) {
-	c := dao.client.DB(metabase).C(shards)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase).C(shards)
 	var result []Shard
 	blockIDStr := g.Query("blockID")
 	blockID, err := strconv.ParseInt(blockIDStr, 10, 64)
@@ -178,9 +186,10 @@ func BytesToInt64(bys []byte) int64 {
 
 //ReceiveInfo 远程请求接收方返回test
 func (dao *Dao) ReceiveInfo(g *gin.Context) {
-	c := dao.client.DB(metabase).C(blocks)
-	s := dao.client.DB(metabase).C(shards)
-	t := dao.client.DB(metabase).C(record)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase).C(blocks)
+	s := dao.client[r].DB(metabase).C(shards)
+	t := dao.client[r].DB(metabase).C(record)
 	// messages := Messages{}
 	var blocks []Block
 	record := Record{}
@@ -276,7 +285,8 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 	min32 := int32(min)
 	max32 := int32(max)
 
-	c := dao.client.DB(metabase).C(record)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		record := Record{}
 		recordOld := Record{}
@@ -296,9 +306,10 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
 func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
-	c := dao.client.DB(metabase).C(blocks)
-	s := dao.client.DB(metabase).C(shards)
-	t := dao.client.DB(metabase).C(record)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase).C(blocks)
+	s := dao.client[r].DB(metabase).C(shards)
+	t := dao.client[r].DB(metabase).C(record)
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
 
@@ -310,8 +321,6 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
 		return
 	}
-
-	fmt.Println("url::::", url)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err == nil {
@@ -319,34 +328,38 @@ func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn 
 	}
 	if len(blocks) > 0 {
 		fmt.Println("startBlockID:", start, "endBlockID", end, "SN:", sn, "Block counts:", len(blocks))
+		var itemsBlocks []interface{}
+		for _, b := range blocks {
+			n := Block{}
+			n.ID = b.ID
+			n.AR = b.AR
+			n.VNF = b.VNF
+			itemsBlocks = append(itemsBlocks, n)
+		}
+		errB := c.Insert(itemsBlocks...)
+		if errB != nil {
+			fmt.Println("Insert Blocks error")
+			// return
+		}
+		var items []interface{}
 		for _, bb := range blocks {
-			var items []interface{}
 			b := Block{}
 			b.ID = bb.ID
 			b.AR = bb.AR
 			b.VNF = bb.VNF
-			err1 := c.Insert(&b)
-			if err1 != nil {
 
-				end = start
-				fmt.Println(err1)
-				fmt.Println("Insert Block error，BlockID:", bb.ID)
-				// CheckErr(err1)
-			}
 			for _, ss := range bb.Shards {
 				ss.BlockID = b.ID
 				items = append(items, ss)
 			}
-			err2 := s.Insert(items...)
-			if err2 != nil {
-				fmt.Println(err2)
-				fmt.Println("Insert shards error，blockID:", bb.ID)
-			}
 
+		}
+		errS := s.Insert(items...)
+		if errS != nil {
+			fmt.Println(errS)
 		}
 	}
 	record := Record{}
-	// startTime, err := strconv.ParseInt(start, 10, 32)
 	entTime, err3 := strconv.ParseInt(end, 10, 32)
 	CheckErr(err3)
 	time1 := dao.cfg.GetRecieveInfo("time")
@@ -379,15 +392,13 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	countnum, err := strconv.ParseInt(sncount, 10, 32)
 	sleetTime1 := cfg.GetRecieveInfo("sleep")
 	sleepTime2, err := strconv.ParseInt(sleetTime1, 10, 32)
-
 	if err != nil {
 
 	}
-
 	var result []*Record
 	num := int(countnum)
-
-	c := dao.client.DB(metabase).C(record)
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		r := new(Record)
 		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
@@ -395,41 +406,68 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	}
 	timec := cfg.GetRecieveInfo("time")
 	time32, err := strconv.ParseInt(timec, 10, 32)
+	coroutinesNumber1 := cfg.GetRecieveInfo("coroutinesNumber")
+	coroutinesNumber32, err := strconv.ParseInt(coroutinesNumber1, 10, 32)
+	coroutinesNumber := int(coroutinesNumber32)
 	for _, record := range result {
-		r := record
-		go func() {
-			mm := 0
-			for num > 0 {
-				fmt.Println("Goroutine ", r.Sn)
-				delayTime1 := cfg.GetRecieveInfo("delayTime")
-				delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
-				if err != nil {
-				}
-				now1 := time.Now().Unix() - delayTime
-				if now1 < int64(r.EndTime) {
-					// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
-
-					sleepTime := time.Duration(sleepTime2)
-					fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", sleepTime, " 分钟后")
-					time.Sleep(time.Minute * sleepTime)
-				}
-				var start string
-				var end string
-				if mm == 0 {
-					start = fmt.Sprintf("%d", r.EndTime)
-					end = fmt.Sprintf("%d", r.EndTime+int32(time32))
-				} else {
-					c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
-					start = fmt.Sprintf("%d", r.StartTime)
-					end = fmt.Sprintf("%d", r.EndTime)
-				}
-
-				addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
-				dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
-				mm++
-			}
-			wg.Done()
-		}()
-		wg.Add(1)
+		re := record
+		var executor Executor
+		addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", re.Sn))
+		executor.AddURL = addr
+		executor.TimeC = int(time32)
+		executor.SleepTime = int(sleepTime2)
+		executor.Snid = re.Sn
+		pool := grpool.NewPool(coroutinesNumber, 0)
+		executor.Pool = pool
+		executor.dao = dao
+		// executor.InitPoolTask()
+		go executor.start(addr, executor.Snid)
 	}
+	// for _, record := range result {
+	// 	re := record
+	// 	var executor Executor
+	// 	addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", re.Sn))
+
+	// }
+
+	// for _, record := range result {
+	// 	r := record
+	// 	var ex Executor
+	// 	go func() {
+	// 		mm := 0
+	// 		for num > 0 {
+	// 			fmt.Println("Goroutine ", r.Sn)
+	// 			delayTime1 := cfg.GetRecieveInfo("delayTime")
+	// 			delayTime, err := strconv.ParseInt(delayTime1, 10, 32)
+	// 			if err != nil {
+	// 			}
+	// 			now1 := time.Now().Unix() - delayTime
+	// 			if now1 < int64(r.EndTime) {
+	// 				// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+
+	// 				sleepTime := time.Duration(sleepTime2)
+	// 				fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", sleepTime, " 分钟后")
+	// 				time.Sleep(time.Minute * sleepTime)
+	// 			}
+	// 			var start string
+	// 			var end string
+	// 			if mm == 0 {
+	// 				start = fmt.Sprintf("%d", r.EndTime)
+	// 				end = fmt.Sprintf("%d", r.EndTime+int32(time32))
+	// 			} else {
+	// 				c.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
+	// 				start = fmt.Sprintf("%d", r.StartTime)
+	// 				end = fmt.Sprintf("%d", r.EndTime)
+	// 			}
+
+	// 			addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", r.Sn))
+	// 			ex.PullBlocksAndShardsByTimes(addr, start, end, r.Sn, dao)
+	// 			// dao.insertBlocksAndShardsFromService(addr, start, end, r.Sn)
+
+	// 			mm++
+	// 		}
+	// 		wg.Done()
+	// 	}()
+	// 	wg.Add(1)
+	// }
 }
