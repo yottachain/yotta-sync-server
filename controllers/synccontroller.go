@@ -90,7 +90,7 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 			VNF := Block.VNF
 			num = int(VNF)
 			if m == 0 {
-				fmt.Println("First Shard ID:", shards[m].ID)
+				// fmt.Println("First Shard ID:", shards[m].ID)
 				ccc = num
 			} else {
 				ccc = ccc + num
