@@ -75,7 +75,6 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		}
 
 		var blocks []Block
-		fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
 
 		//生成要访问的url
 		url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
@@ -91,6 +90,7 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 			err = json.Unmarshal(body, &blocks)
 		}
 
+		// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
 		// 屏蔽写表功能
 		executor.blocks = blocks
 		executor.Pool.JobQueue <- func() {
@@ -99,7 +99,9 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 			executor.InsertBlockAndShard(bs)
 			// executor.saveBlocksToFile(start, executor.Snid, bs)
 		}
-		fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
+		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
+
+		// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
 		record := Record{}
 		entTime, err3 := strconv.ParseInt(end, 10, 32)
 		CheckErr(err3)
