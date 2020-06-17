@@ -421,8 +421,19 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 		pool := grpool.NewPool(coroutinesNumber, 0)
 		executor.Pool = pool
 		executor.dao = dao
+
 		// executor.InitPoolTask()
-		go executor.start(addr, executor.Snid)
+		go func() {
+			for coroutinesNumber > 0 {
+				rnm := new(Record)
+				c.Find(bson.M{"sn": re.Sn}).Sort("-1").Limit(1).One(rnm)
+				executor.start(addr, rnm.StartTime, rnm.EndTime, executor.Snid)
+			}
+		}()
+
+		// for i := 0; i < coroutinesNumber; i++ {
+		// 	go func(){}
+		// }
 	}
 	// for _, record := range result {
 	// 	re := record

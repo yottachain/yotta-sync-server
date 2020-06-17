@@ -30,32 +30,22 @@ type Executor struct {
 	blocks    []Block
 }
 
-func (executor *Executor) start(addr string, snid int) {
-	executor.PullBlocksAndShardsByTimes(addr, snid)
+func (executor *Executor) start(addr string, start, end int32, snid int) {
+	// executor.PullBlocksAndShardsByTimes(addr, snid)
+
 	// executor.Pool.JobQueue <- func() {
 	// 	bs := executor.blocks
 	// 	executor.InsertBlockAndShard(bs)
 	// }
+
+	executor.blocks = executor.PullBlocksAndShards(addr, start, end, snid)
+	executor.Pool.JobQueue <- func() {
+		bs := executor.blocks
+		executor.InsertBlockAndShard(bs)
+	}
 }
 
-// func (executor *Executor) InitPoolTask() {
-// 	// number of workers, and size of job queue
-// 	// pool := grpool.NewPool(10, 10)
-
-// 	// release resources used by pool
-// 	// defer pool.Release()
-// 	executor.Pool.JobQueue <- func() {
-// 		bs := executor.blocks
-// 		// var bs []Block
-// 		executor.InsertBlockAndShard(bs)
-// 	}
-
-// }
-
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
-	// var num int = 1
-
-	// for num > 0 {
 
 	fmt.Println("Goroutine ", sn)
 	t := executor.dao.client[0].DB("metabase").C("record")
@@ -70,11 +60,12 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 	}
 	if now1 < int64(endTime) {
 		// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
-		fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.SleepTime, " 分钟后")
-		time.Sleep(time.Minute * time.Duration(executor.SleepTime))
+		fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.TimeC, " 分钟后")
+		time.Sleep(time.Minute * time.Duration(executor.TimeC))
 	}
 
 	var blocks []Block
+	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
 
 	//生成要访问的url
 	url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
@@ -89,28 +80,25 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
 	}
-	fmt.Println("Blocks size:", len(blocks))
 
-	// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
+	// 屏蔽写表功能
+	executor.blocks = blocks
+	executor.Pool.JobQueue <- func() {
+		bs := executor.blocks
+		executor.InsertBlockAndShard(bs)
+	}
+	fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 	record := Record{}
 	entTime, err3 := strconv.ParseInt(end, 10, 32)
 	CheckErr(err3)
 	time1 := executor.dao.cfg.GetRecieveInfo("time")
 	time32, err4 := strconv.ParseInt(time1, 10, 32)
 	CheckErr(err4)
-	rr := new(Record)
-	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(rr)
-	if int32(entTime) < rr.EndTime {
-		record.StartTime = rr.EndTime
-		record.EndTime = rr.EndTime + int32(time32)
-	} else {
-		min32 := int32(entTime)
-		max32 := int32(entTime) + int32(time32)
+	min32 := int32(entTime)
+	max32 := int32(entTime) + int32(time32)
 
-		record.StartTime = min32
-		record.EndTime = max32
-	}
-
+	record.StartTime = min32
+	record.EndTime = max32
 	record.Sn = sn
 	selector := bson.M{"sn": record.Sn}
 	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
@@ -118,24 +106,64 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 	if err5 != nil {
 		fmt.Println(err5)
 	}
+	fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 
-	// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
-	// 屏蔽写表功能
-	fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
+}
 
-	executor.blocks = blocks
-	// executor.Pool.JobQueue <- func() {
-	// 	bs := executor.blocks
-	// 	// var bs []Block
-	// 	executor.InsertBlockAndShard(bs)
-	// 	// executor.saveBlocksToFile(start, executor.Snid, bs)
-	// }
+func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime int32, sn int) []Block {
+	fmt.Println("Goroutine ", sn)
 
-	// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
-	// }
-	bs := executor.blocks
-	executor.InsertBlockAndShard(bs)
+	startc := fmt.Sprintf("%d", startTime)
+	endc := fmt.Sprintf("%d", endTime)
+	t := executor.dao.client[0].DB("metabase").C("record")
+	r := new(Record)
+	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 
+	now1 := time.Now().Unix() - int64(executor.TimeC)
+
+	if now1 < int64(endTime) {
+		// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+		fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.TimeC, " 分钟后")
+		time.Sleep(time.Minute * time.Duration(executor.TimeC))
+	}
+
+	var blocks []Block
+	fmt.Println("snAttrs:", snAttrs, " ,start:", startTime, ",end:", endTime, ",sn:", sn)
+
+	//生成要访问的url
+	url := snAttrs + "/sync/get_blocks?start=" + startc + "&end=" + endc
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
+
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		err = json.Unmarshal(body, &blocks)
+	}
+
+	fmt.Println("blocks len:::::::::::::::::::", len(blocks))
+	record := Record{}
+	entTime, err3 := strconv.ParseInt(endc, 10, 32)
+	CheckErr(err3)
+	time1 := executor.dao.cfg.GetRecieveInfo("time")
+	time32, err4 := strconv.ParseInt(time1, 10, 32)
+	CheckErr(err4)
+	min32 := int32(entTime)
+	max32 := int32(entTime) + int32(time32)
+
+	record.StartTime = min32
+	record.EndTime = max32
+	record.Sn = sn
+	selector := bson.M{"sn": record.Sn}
+	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
+	err5 := t.Update(selector, data)
+	if err5 != nil {
+		fmt.Println(err5)
+	}
+	return blocks
 }
 
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
@@ -175,8 +203,6 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			fmt.Println(errS)
 		}
 	}
-
-	executor.PullBlocksAndShardsByTimes(executor.AddURL, executor.Snid)
 }
 
 // saveBlocksToFile 将拉取的数据保存到本地
