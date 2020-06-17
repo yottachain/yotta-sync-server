@@ -53,86 +53,86 @@ func (executor *Executor) start(addr string, snid int) {
 // }
 
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
-	var num int = 1
+	// var num int = 1
 
-	for num > 0 {
+	// for num > 0 {
 
-		fmt.Println("Goroutine ", sn)
-		t := executor.dao.client[0].DB("metabase").C("record")
-		r := new(Record)
-		t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
-		start := fmt.Sprintf("%d", r.StartTime)
-		end := fmt.Sprintf("%d", r.EndTime)
-		now1 := time.Now().Unix() - int64(executor.TimeC)
-		endTime, err := strconv.ParseInt(end, 10, 32)
-		if err != nil {
+	fmt.Println("Goroutine ", sn)
+	t := executor.dao.client[0].DB("metabase").C("record")
+	r := new(Record)
+	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
+	start := fmt.Sprintf("%d", r.StartTime)
+	end := fmt.Sprintf("%d", r.EndTime)
+	now1 := time.Now().Unix() - int64(executor.TimeC)
+	endTime, err := strconv.ParseInt(end, 10, 32)
+	if err != nil {
 
-		}
-		if now1 < int64(endTime) {
-			// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
-			fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.SleepTime, " 分钟后")
-			time.Sleep(time.Minute * time.Duration(executor.SleepTime))
-		}
-
-		var blocks []Block
-
-		//生成要访问的url
-		url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
-
-		resp, err := http.Get(url)
-		if err != nil {
-			fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
-
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			err = json.Unmarshal(body, &blocks)
-		}
-		fmt.Println("Blocks size:", len(blocks))
-
-		// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
-		record := Record{}
-		entTime, err3 := strconv.ParseInt(end, 10, 32)
-		CheckErr(err3)
-		time1 := executor.dao.cfg.GetRecieveInfo("time")
-		time32, err4 := strconv.ParseInt(time1, 10, 32)
-		CheckErr(err4)
-		rr := new(Record)
-		t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(rr)
-		if int32(entTime) < rr.EndTime {
-			record.StartTime = rr.EndTime
-			record.EndTime = rr.EndTime + int32(time32)
-		} else {
-			min32 := int32(entTime)
-			max32 := int32(entTime) + int32(time32)
-
-			record.StartTime = min32
-			record.EndTime = max32
-		}
-
-		record.Sn = sn
-		selector := bson.M{"sn": record.Sn}
-		data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
-		err5 := t.Update(selector, data)
-		if err5 != nil {
-			fmt.Println(err5)
-		}
-
-		// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
-		// 屏蔽写表功能
-		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
-
-		executor.blocks = blocks
-		executor.Pool.JobQueue <- func() {
-			bs := executor.blocks
-			// var bs []Block
-			executor.InsertBlockAndShard(bs)
-			// executor.saveBlocksToFile(start, executor.Snid, bs)
-		}
-
-		// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	}
+	if now1 < int64(endTime) {
+		// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+		fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.SleepTime, " 分钟后")
+		time.Sleep(time.Minute * time.Duration(executor.SleepTime))
+	}
+
+	var blocks []Block
+
+	//生成要访问的url
+	url := snAttrs + "/sync/get_blocks?start=" + start + "&end=" + end
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
+
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		err = json.Unmarshal(body, &blocks)
+	}
+	fmt.Println("Blocks size:", len(blocks))
+
+	// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
+	record := Record{}
+	entTime, err3 := strconv.ParseInt(end, 10, 32)
+	CheckErr(err3)
+	time1 := executor.dao.cfg.GetRecieveInfo("time")
+	time32, err4 := strconv.ParseInt(time1, 10, 32)
+	CheckErr(err4)
+	rr := new(Record)
+	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(rr)
+	if int32(entTime) < rr.EndTime {
+		record.StartTime = rr.EndTime
+		record.EndTime = rr.EndTime + int32(time32)
+	} else {
+		min32 := int32(entTime)
+		max32 := int32(entTime) + int32(time32)
+
+		record.StartTime = min32
+		record.EndTime = max32
+	}
+
+	record.Sn = sn
+	selector := bson.M{"sn": record.Sn}
+	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
+	err5 := t.Update(selector, data)
+	if err5 != nil {
+		fmt.Println(err5)
+	}
+
+	// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
+	// 屏蔽写表功能
+	fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
+
+	executor.blocks = blocks
+	executor.Pool.JobQueue <- func() {
+		bs := executor.blocks
+		// var bs []Block
+		executor.InsertBlockAndShard(bs)
+		// executor.saveBlocksToFile(start, executor.Snid, bs)
+	}
+
+	// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
+	// }
 
 }
 
@@ -173,6 +173,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			fmt.Println(errS)
 		}
 	}
+
+	executor.PullBlocksAndShardsByTimes(executor.AddURL, executor.Snid)
 }
 
 // saveBlocksToFile 将拉取的数据保存到本地
