@@ -124,15 +124,17 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 	fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
 
 	executor.blocks = blocks
-	executor.Pool.JobQueue <- func() {
-		bs := executor.blocks
-		// var bs []Block
-		executor.InsertBlockAndShard(bs)
-		// executor.saveBlocksToFile(start, executor.Snid, bs)
-	}
+	// executor.Pool.JobQueue <- func() {
+	// 	bs := executor.blocks
+	// 	// var bs []Block
+	// 	executor.InsertBlockAndShard(bs)
+	// 	// executor.saveBlocksToFile(start, executor.Snid, bs)
+	// }
 
 	// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	// }
+	bs := executor.blocks
+	executor.InsertBlockAndShard(bs)
 
 }
 
