@@ -62,8 +62,8 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	maxdatas := bytes.Join(maxdata, []byte{})
 	min64 := BytesToInt64(mindatas)
 	max64 := BytesToInt64(maxdatas)
-	fmt.Println("min64:", min64)
-	fmt.Println("max64:", max64)
+	// fmt.Println("min64:", min64)
+	// fmt.Println("max64:", max64)
 	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&blocks)
 	// fmt.Println("blocks count::", len(blocks))
 
@@ -112,6 +112,7 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 		fmt.Println("Shards total counts : ", len(shards))
 	}
 
+	fmt.Println(min64, max64, "blocks size:::", len(result), "shards size:::", len(shards))
 	g.JSON(200, result)
 }
 
