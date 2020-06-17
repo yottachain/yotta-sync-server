@@ -108,8 +108,8 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 			result = append(result, Block)
 		}
 
-		fmt.Println("blocks total counts : ", len(blocks))
-		fmt.Println("Shards total counts : ", len(shards))
+		// fmt.Println("blocks total counts : ", len(blocks))
+		// fmt.Println("Shards total counts : ", len(shards))
 	}
 
 	fmt.Println(min64, max64, "blocks size:::", len(result), "shards size:::", len(shards))
