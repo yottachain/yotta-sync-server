@@ -91,18 +91,6 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		}
 		fmt.Println("Blocks size:", len(blocks))
 
-		// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
-		// 屏蔽写表功能
-		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
-
-		executor.blocks = blocks
-		executor.Pool.JobQueue <- func() {
-			bs := executor.blocks
-			// var bs []Block
-			executor.InsertBlockAndShard(bs)
-			// executor.saveBlocksToFile(start, executor.Snid, bs)
-		}
-
 		// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
 		record := Record{}
 		entTime, err3 := strconv.ParseInt(end, 10, 32)
@@ -130,6 +118,19 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		if err5 != nil {
 			fmt.Println(err5)
 		}
+
+		// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
+		// 屏蔽写表功能
+		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
+
+		executor.blocks = blocks
+		executor.Pool.JobQueue <- func() {
+			bs := executor.blocks
+			// var bs []Block
+			executor.InsertBlockAndShard(bs)
+			// executor.saveBlocksToFile(start, executor.Snid, bs)
+		}
+
 		// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	}
 
