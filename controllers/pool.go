@@ -89,9 +89,12 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		if err == nil {
 			err = json.Unmarshal(body, &blocks)
 		}
+		fmt.Println("Blocks size:", len(blocks))
 
 		// fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn,"Blocks size:",len(blocks))
 		// 屏蔽写表功能
+		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
+
 		executor.blocks = blocks
 		executor.Pool.JobQueue <- func() {
 			bs := executor.blocks
@@ -99,7 +102,6 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 			executor.InsertBlockAndShard(bs)
 			// executor.saveBlocksToFile(start, executor.Snid, bs)
 		}
-		fmt.Println("now time:", now1, "snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn, "Blocks size:", len(blocks))
 
 		// fmt.Println("blocks len::XX:::::::::::::::::", len(blocks))
 		record := Record{}
@@ -108,11 +110,19 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		time1 := executor.dao.cfg.GetRecieveInfo("time")
 		time32, err4 := strconv.ParseInt(time1, 10, 32)
 		CheckErr(err4)
-		min32 := int32(entTime)
-		max32 := int32(entTime) + int32(time32)
+		rr := new(Record)
+		t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(rr)
+		if int32(entTime) < rr.EndTime {
+			record.StartTime = rr.EndTime
+			record.EndTime = rr.EndTime + int32(time32)
+		} else {
+			min32 := int32(entTime)
+			max32 := int32(entTime) + int32(time32)
 
-		record.StartTime = min32
-		record.EndTime = max32
+			record.StartTime = min32
+			record.EndTime = max32
+		}
+
 		record.Sn = sn
 		selector := bson.M{"sn": record.Sn}
 		data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
@@ -120,7 +130,7 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 		if err5 != nil {
 			fmt.Println(err5)
 		}
-		fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
+		// fmt.Println("startTime ：", start, "endTime :", end, "sync sn: sn :", sn, " next ready")
 	}
 
 }
