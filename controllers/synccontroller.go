@@ -22,6 +22,21 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+//GetIDByTimestamp 根据时间戳获取ID最小范围
+func (dao *Dao) GetIDByTimestamp(g *gin.Context) {
+	timec := g.Query("time")
+	timeINT, err := strconv.ParseInt(timec, 10, 32)
+	CheckErr(err)
+	time32 := int32(timeINT)
+	timeByte := Int32ToBytes(time32)
+	ee := []byte{0x00, 0x00, 0x00, 0x00}
+	data := [][]byte{timeByte, ee}
+	datas := bytes.Join(data, []byte{})
+	ID := BytesToInt64(datas)
+	fmt.Println("ID:::::", ID)
+	g.String(200, "ID=%s", fmt.Sprintf("%d", ID))
+}
+
 func (dao *Dao) GetTimeStamp(g *gin.Context) {
 	blockID := g.Query("blockID")
 	fmt.Println("blockID::::::::::", blockID)
