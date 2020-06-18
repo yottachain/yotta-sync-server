@@ -498,3 +498,27 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	// 	wg.Add(1)
 	// }
 }
+
+//GetShardsCount 获取真实分片数量
+func (dao *Dao) GetShardsCount(g *gin.Context) {
+	metabase_db := dao.cfg.GetConfigInfo("db")
+
+	r := rand.Intn(len(dao.client))
+	c := dao.client[r].DB(metabase_db).C(blocks)
+	var blocks []Block
+	// messages := Messages{}
+	start := g.Query("start")
+	end := g.Query("end")
+	min, err := strconv.ParseInt(start, 10, 64)
+	max, err := strconv.ParseInt(end, 10, 64)
+	CheckErr(err)
+
+	c.Find(bson.M{"_id": bson.M{"$lte": max, "$gt": min}}).Sort("_id").All(&blocks)
+	var count int32 = 0
+	for _, block := range blocks {
+		count = count + block.VNF
+	}
+	fmt.Println("count:", count)
+
+	g.String(200, "shardsCount=%s", fmt.Sprintf("%d", count))
+}
