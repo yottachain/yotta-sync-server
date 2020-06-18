@@ -50,7 +50,8 @@ func InitRouter(cfg *conf.Config, wg *sync.WaitGroup) (router *gin.Engine) {
 			v1.GET("/get_shards", dao.GetShardsByBlockIDAndVNF)
 			v1.GET("/get_receive", dao.ReceiveInfo)
 			v1.GET("/get_timeStamp", dao.GetTimeStamp)
-			// v1.GET("/createInitRecord", dao.CreateInitSyncRecord)
+			v1.GET("/getIDByTime", dao.GetIDByTimestamp)
+			v1.GET("/getShardsCount", dao.GetShardsCount)
 		}
 	}
 
