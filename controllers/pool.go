@@ -144,7 +144,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 			if err != nil {
 				time.Sleep(time.Minute * time.Duration(executor.SleepTime))
 			} else {
-				retry = 6
+				retry = 5
 			}
 		}
 
