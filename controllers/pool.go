@@ -110,6 +110,7 @@ func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 
 }
 
+//PullBlocksAndShards 同步块和分片
 func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime int32, sn int) []Block {
 	fmt.Println("Goroutine ", sn)
 
@@ -134,8 +135,18 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	url := snAttrs + "/sync/get_blocks?start=" + startc + "&end=" + endc
 
 	resp, err := http.Get(url)
+
 	if err != nil {
 		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
+		var retry int = 0
+		for retry != 5 {
+			resp, err = http.Get(url)
+			if err != nil {
+				time.Sleep(time.Minute * time.Duration(executor.SleepTime))
+			} else {
+				retry = 5
+			}
+		}
 
 	}
 	defer resp.Body.Close()
