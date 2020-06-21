@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -15,32 +16,18 @@ import (
 )
 
 func main() {
-	cfg, err := conf.CreateConfig("../conf/yotta_config.ini")
+
+	var path string
+	if len(os.Args) != 0 && os.Args[1] != "" {
+		path = os.Args[1]
+	} else {
+		path = "../conf/yotta_config.ini"
+	}
+	fmt.Println("path ==== ", path)
+
+	cfg, err := conf.CreateConfig(path)
 	if err != nil {
 		panic(err)
-	}
-	path := cfg.GetConfigInfo("path")
-	if path != "no" {
-		cfg2, err := conf.CreateConfig(path)
-		if err != nil {
-			panic(err)
-		}
-		log.Info(time.Now().Format("2006-01-02 15:04:05") + " start ......")
-		service := cfg2.GetRecieveInfo("service")
-		log.Info("service::::::::", "off" == service)
-		log.Info("   start ......")
-		fmt.Println("service::::::::", "off" == service)
-
-		flag.Parse()
-		wg := &sync.WaitGroup{}
-		router := routers.InitRouter(cfg2, wg)
-		// cronInit()
-
-		port := cfg2.GetHTTPInfo("port")
-		err1 := router.Run(port)
-		if err1 != nil {
-			panic(err1)
-		}
 	}
 
 	//conf := &conf.Config
