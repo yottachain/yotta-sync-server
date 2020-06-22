@@ -18,12 +18,16 @@ import (
 func main() {
 
 	var path string
-	if len(os.Args) != 0 && os.Args[1] != "" {
-		path = os.Args[1]
+	if len(os.Args) > 1 {
+		if os.Args[1] != "" {
+			path = os.Args[1]
+		} else {
+			path = "../conf/yotta_config.ini"
+		}
+
 	} else {
 		path = "../conf/yotta_config.ini"
 	}
-	fmt.Println("path ==== ", path)
 
 	cfg, err := conf.CreateConfig(path)
 	if err != nil {
