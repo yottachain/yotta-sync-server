@@ -48,7 +48,9 @@ func (executor *Executor) start(addr string, start, end int32, snid int) {
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 
 	fmt.Println("Goroutine ", sn)
-	t := executor.dao.client[0].DB("metabase").C("record")
+	sess := executor.dao.client[0].Copy()
+	defer sess.Close()
+	t := sess.DB("metabase").C("record")
 	r := new(Record)
 	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 	start := fmt.Sprintf("%d", r.StartTime)
@@ -116,7 +118,9 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	startc := fmt.Sprintf("%d", startTime)
 	endc := fmt.Sprintf("%d", endTime)
-	t := executor.dao.client[0].DB("metabase").C("record")
+	sess := executor.dao.client[0].Copy()
+	defer sess.Close()
+	t := sess.DB("metabase").C("record")
 	r := new(Record)
 	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 
@@ -180,8 +184,10 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 	// fmt.Println("*********************************************")
 	r := rand.Intn(len(executor.dao.client))
-	c := executor.dao.client[r].DB(metabase).C("blocks")
-	s := executor.dao.client[r].DB(metabase).C("shards")
+	sess := executor.dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C("blocks")
+	s := sess.DB(metabase).C("shards")
 	if len(blocks) > 0 {
 		var itemsBlocks []interface{}
 		for _, b := range blocks {
