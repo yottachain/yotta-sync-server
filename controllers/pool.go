@@ -138,7 +138,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", startTime, ",end:", endTime, ",sn:", sn)
-	time11 := time.Now().Unix()
+	time11 := time.Now().UnixNano()
 	fmt.Println("Pull start,", "SN:", sn, "pull start time:", time11)
 	//生成要访问的url
 	url := snAttrs + "/sync/get_blocks?start=" + startc + "&end=" + endc
@@ -163,8 +163,8 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
 	}
-	time22 := time.Now().Unix()
-	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data times:", time22-time11, "S")
+	time22 := time.Now().UnixNano()
+	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data times:", (time22-time11)/100000, "ms")
 	// fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 	record := Record{}
 	entTime, err3 := strconv.ParseInt(endc, 10, 32)
@@ -191,8 +191,8 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 		fmt.Println(err5)
 	}
 
-	time33 := time.Now().Unix()
-	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record times:", time33-time22, "S")
+	time33 := time.Now().UnixNano()
+	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record times:", (time33-time22)/100000, "ms")
 	return blocks
 }
 
@@ -204,7 +204,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 	c := sess.DB(metabase).C("blocks")
 	s := sess.DB(metabase).C("shards")
 	if len(blocks) > 0 {
-		time44 := time.Now().Unix()
+		time44 := time.Now().UnixNano()
 		fmt.Println("SN:", executor.Snid, ",Blocks len:", len(blocks), ",time1:", time44)
 		var itemsBlocks []interface{}
 		for _, b := range blocks {
@@ -224,8 +224,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 				log.Printf("Block: Sync: error when inserting block to database: %s\n", errB.Error())
 			}
 		}
-		time55 := time.Now().Unix()
-		fmt.Println("Insert Blocks complete,", "SN:", executor.Snid, ",time2:", time55, ",Insert blocks times:", time55-time44, "S")
+		time55 := time.Now().UnixNano()
+		fmt.Println("Insert Blocks complete,", "SN:", executor.Snid, ",time2:", time55, ",Insert blocks times:", (time55-time44)/100000, "ms")
 		var items []interface{}
 		for _, bb := range blocks {
 			b := Block{}
@@ -247,8 +247,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 				log.Printf("Shard: Sync: error when inserting shard to database: %s\n", errS.Error())
 			}
 		}
-		time66 := time.Now().Unix()
-		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time3:", time66, ",Insert shards times:", time66-time55, "S")
+		time66 := time.Now().UnixNano()
+		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time3:", time66, ",Insert shards times:", (time66-time55)/100000, "ms")
 	}
 }
 
