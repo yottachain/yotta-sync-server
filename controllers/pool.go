@@ -207,7 +207,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 		}
 		errB := c.Insert(itemsBlocks...)
 		if errB != nil {
-			fmt.Println("Insert Blocks error")
+			fmt.Println("Insert Blocks error:::", errB)
+
 			errBStr := errB.Error()
 			if !strings.ContainsAny(errBStr, "duplicate key error") {
 				log.Printf("Block: Sync: error when inserting block to database: %s\n", errB.Error())
@@ -228,7 +229,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 		}
 		errS := s.Insert(items...)
 		if errS != nil {
-			fmt.Println("Insert Shards error")
+			fmt.Println("Insert Shards error:::", errS)
 			errSStr := errS.Error()
 			if !strings.ContainsAny(errSStr, "duplicate key error") {
 				log.Printf("Shard: Sync: error when inserting shard to database: %s\n", errS.Error())
