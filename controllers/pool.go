@@ -41,10 +41,12 @@ func (executor *Executor) start(addr string, start, end int32, snid int) {
 	// }
 
 	executor.blocks = executor.PullBlocksAndShards(addr, start, end, snid)
-	executor.Pool.JobQueue <- func() {
-		bs := executor.blocks
-		executor.InsertBlockAndShard(bs)
-	}
+	bs := executor.blocks
+	executor.InsertBlockAndShard(bs)
+	// executor.Pool.JobQueue <- func() {
+	// 	bs := executor.blocks
+	// 	executor.InsertBlockAndShard(bs)
+	// }
 }
 
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
