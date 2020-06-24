@@ -239,6 +239,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			}
 
 		}
+		time66 := time.Now().UnixNano()
+		fmt.Println("Insert Shards before,", "SN:", executor.Snid, ",time3:", time66, ",take times:", (time66-time55)/100000, "ms", "Shards len:", len(items))
 		errS := s.Insert(items...)
 		if errS != nil {
 			fmt.Println("Insert Shards error:::", errS)
@@ -247,8 +249,8 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 				log.Printf("Shard: Sync: error when inserting shard to database: %s\n", errS.Error())
 			}
 		}
-		time66 := time.Now().UnixNano()
-		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time3:", time66, ",Insert shards times:", (time66-time55)/100000, "ms", "Shards len:", len(items))
+		time77 := time.Now().UnixNano()
+		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time4:", time66, ",Insert shards times:", (time77-time66)/100000, "ms", "Shards len:", len(items))
 	}
 }
 
