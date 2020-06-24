@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ivpusic/grpool"
@@ -171,6 +173,12 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	record.StartTime = min32
 	record.EndTime = max32
+	if record.StartTime == 0 {
+		startTime1 := executor.dao.cfg.GetRecieveInfo("start")
+		reStartTime, _ := strconv.ParseInt(startTime1, 10, 32)
+		record.StartTime = int32(reStartTime)
+		record.EndTime = int32(reStartTime) + int32(time32)
+	}
 	record.Sn = sn
 	selector := bson.M{"sn": record.Sn}
 	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
@@ -181,8 +189,8 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	return blocks
 }
 
+//InsertBlockAndShard 插入block shard
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
-	// fmt.Println("*********************************************")
 	r := rand.Intn(len(executor.dao.client))
 	sess := executor.dao.client[r].Copy()
 	defer sess.Close()
@@ -200,7 +208,10 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 		errB := c.Insert(itemsBlocks...)
 		if errB != nil {
 			fmt.Println("Insert Blocks error")
-			// return
+			errBStr := errB.Error()
+			if !strings.ContainsAny(errBStr, "duplicate key error") {
+				log.Printf("Block: Sync: error when inserting block to database: %s\n", errB.Error())
+			}
 		}
 		var items []interface{}
 		for _, bb := range blocks {
@@ -217,7 +228,11 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 		}
 		errS := s.Insert(items...)
 		if errS != nil {
-			fmt.Println(errS)
+			fmt.Println("Insert Shards error")
+			errSStr := errS.Error()
+			if !strings.ContainsAny(errSStr, "duplicate key error") {
+				log.Printf("Shard: Sync: error when inserting shard to database: %s\n", errS.Error())
+			}
 		}
 	}
 }
