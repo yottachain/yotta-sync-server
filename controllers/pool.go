@@ -164,7 +164,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 		err = json.Unmarshal(body, &blocks)
 	}
 	time22 := time.Now().UnixNano()
-	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data times:", (time22-time11)/100000, "ms")
+	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data take times:", (time22-time11)/100000, "ms")
 	// fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 	record := Record{}
 	entTime, err3 := strconv.ParseInt(endc, 10, 32)
@@ -192,7 +192,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	}
 
 	time33 := time.Now().UnixNano()
-	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record times:", (time33-time22)/100000, "ms")
+	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record take times:", (time33-time22)/100000, "ms")
 	return blocks
 }
 
@@ -225,7 +225,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			}
 		}
 		time55 := time.Now().UnixNano()
-		fmt.Println("Insert Blocks complete,", "SN:", executor.Snid, ",time2:", time55, ",Insert blocks times:", (time55-time44)/100000, "ms")
+		fmt.Println("Insert Blocks complete,", "SN:", executor.Snid, ",time2:", time55, ",Insert blocks take times:", (time55-time44)/100000, "ms")
 		var items []interface{}
 		for _, bb := range blocks {
 			b := Block{}
@@ -240,7 +240,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 
 		}
 		time66 := time.Now().UnixNano()
-		fmt.Println("Insert Shards before,", "SN:", executor.Snid, ",time3:", time66, ",take times:", (time66-time55)/100000, "ms", "Shards len:", len(items))
+		fmt.Println("Insert Shards before,", "SN:", executor.Snid, ",time3:", time66, ",Shards len:", len(items), ",take times:", (time66-time55)/100000, "ms")
 		errS := s.Insert(items...)
 		if errS != nil {
 			fmt.Println("Insert Shards error:::", errS)
@@ -250,7 +250,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			}
 		}
 		time77 := time.Now().UnixNano()
-		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time4:", time66, ",Insert shards times:", (time77-time66)/100000, "ms", "Shards len:", len(items))
+		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time4:", time66, "Shards len:", len(items), ",Insert shards take times:", (time77-time66)/100000, "ms")
 	}
 }
 
