@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ivpusic/grpool"
@@ -39,16 +41,20 @@ func (executor *Executor) start(addr string, start, end int32, snid int) {
 	// }
 
 	executor.blocks = executor.PullBlocksAndShards(addr, start, end, snid)
-	executor.Pool.JobQueue <- func() {
-		bs := executor.blocks
-		executor.InsertBlockAndShard(bs)
-	}
+	bs := executor.blocks
+	executor.InsertBlockAndShard(bs)
+	// executor.Pool.JobQueue <- func() {
+	// 	bs := executor.blocks
+	// 	executor.InsertBlockAndShard(bs)
+	// }
 }
 
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 
 	fmt.Println("Goroutine ", sn)
-	t := executor.dao.client[0].DB("metabase").C("record")
+	sess := executor.dao.client[0].Copy()
+	defer sess.Close()
+	t := sess.DB("metabase").C("record")
 	r := new(Record)
 	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 	start := fmt.Sprintf("%d", r.StartTime)
@@ -116,7 +122,9 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	startc := fmt.Sprintf("%d", startTime)
 	endc := fmt.Sprintf("%d", endTime)
-	t := executor.dao.client[0].DB("metabase").C("record")
+	sess := executor.dao.client[0].Copy()
+	defer sess.Close()
+	t := sess.DB("metabase").C("record")
 	r := new(Record)
 	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
 
@@ -130,7 +138,8 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", startTime, ",end:", endTime, ",sn:", sn)
-
+	time11 := time.Now().UnixNano()
+	fmt.Println("Pull start,", "SN:", sn, "pull start time:", time11)
 	//生成要访问的url
 	url := snAttrs + "/sync/get_blocks?start=" + startc + "&end=" + endc
 
@@ -154,8 +163,9 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	if err == nil {
 		err = json.Unmarshal(body, &blocks)
 	}
-
-	fmt.Println("blocks len:::::::::::::::::::", len(blocks))
+	time22 := time.Now().UnixNano()
+	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data take times:", (time22-time11)/100000, "ms")
+	// fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 	record := Record{}
 	entTime, err3 := strconv.ParseInt(endc, 10, 32)
 	CheckErr(err3)
@@ -167,6 +177,12 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 
 	record.StartTime = min32
 	record.EndTime = max32
+	if record.StartTime == 0 {
+		startTime1 := executor.dao.cfg.GetRecieveInfo("start")
+		reStartTime, _ := strconv.ParseInt(startTime1, 10, 32)
+		record.StartTime = int32(reStartTime)
+		record.EndTime = int32(reStartTime) + int32(time32)
+	}
 	record.Sn = sn
 	selector := bson.M{"sn": record.Sn}
 	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
@@ -174,15 +190,22 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	if err5 != nil {
 		fmt.Println(err5)
 	}
+
+	time33 := time.Now().UnixNano()
+	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record take times:", (time33-time22)/100000, "ms")
 	return blocks
 }
 
+//InsertBlockAndShard 插入block shard
 func (executor *Executor) InsertBlockAndShard(blocks []Block) {
-	// fmt.Println("*********************************************")
 	r := rand.Intn(len(executor.dao.client))
-	c := executor.dao.client[r].DB(metabase).C("blocks")
-	s := executor.dao.client[r].DB(metabase).C("shards")
+	sess := executor.dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C("blocks")
+	s := sess.DB(metabase).C("shards")
 	if len(blocks) > 0 {
+		time44 := time.Now().UnixNano()
+		fmt.Println("SN:", executor.Snid, ",Blocks len:", len(blocks), ",time1:", time44)
 		var itemsBlocks []interface{}
 		for _, b := range blocks {
 			n := Block{}
@@ -192,10 +215,17 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			itemsBlocks = append(itemsBlocks, n)
 		}
 		errB := c.Insert(itemsBlocks...)
+
 		if errB != nil {
-			fmt.Println("Insert Blocks error")
-			// return
+			fmt.Println("Insert Blocks error:::", errB)
+
+			errBStr := errB.Error()
+			if !strings.ContainsAny(errBStr, "duplicate key error") {
+				log.Printf("Block: Sync: error when inserting block to database: %s\n", errB.Error())
+			}
 		}
+		time55 := time.Now().UnixNano()
+		fmt.Println("Insert Blocks complete,", "SN:", executor.Snid, ",time2:", time55, ",Insert blocks take times:", (time55-time44)/100000, "ms")
 		var items []interface{}
 		for _, bb := range blocks {
 			b := Block{}
@@ -209,10 +239,18 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			}
 
 		}
+		time66 := time.Now().UnixNano()
+		fmt.Println("Insert Shards before,", "SN:", executor.Snid, ",time3:", time66, ",Shards len:", len(items), ",take times:", (time66-time55)/100000, "ms")
 		errS := s.Insert(items...)
 		if errS != nil {
-			fmt.Println(errS)
+			fmt.Println("Insert Shards error:::", errS)
+			errSStr := errS.Error()
+			if !strings.ContainsAny(errSStr, "duplicate key error") {
+				log.Printf("Shard: Sync: error when inserting shard to database: %s\n", errS.Error())
+			}
 		}
+		time77 := time.Now().UnixNano()
+		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time4:", time66, "Shards len:", len(items), ",Insert shards take times:", (time77-time66)/100000, "ms")
 	}
 }
 

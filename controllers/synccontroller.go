@@ -54,8 +54,9 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	metabase_db := dao.cfg.GetConfigInfo("db")
 
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase_db).C(blocks)
-	s := dao.client[r].DB(metabase_db).C(shards)
+	sess := dao.client[r].Copy()
+	c := sess.DB(metabase_db).C(blocks)
+	s := sess.DB(metabase_db).C(shards)
 	var blocks []Block
 	var shards []Shard
 	var result []Block
@@ -134,7 +135,9 @@ func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 //GetShardsByBlockIDAndVNF 根据blockid、VNF查shards表
 func (dao *Dao) GetShardsByBlockIDAndVNF(g *gin.Context) {
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase).C(shards)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(shards)
 	var result []Shard
 	blockIDStr := g.Query("blockID")
 	blockID, err := strconv.ParseInt(blockIDStr, 10, 64)
@@ -203,9 +206,11 @@ func BytesToInt64(bys []byte) int64 {
 //ReceiveInfo 远程请求接收方返回test
 func (dao *Dao) ReceiveInfo(g *gin.Context) {
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase).C(blocks)
-	s := dao.client[r].DB(metabase).C(shards)
-	t := dao.client[r].DB(metabase).C(record)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(blocks)
+	s := sess.DB(metabase).C(shards)
+	t := sess.DB(metabase).C(record)
 	// messages := Messages{}
 	var blocks []Block
 	record := Record{}
@@ -302,7 +307,9 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 	max32 := int32(max)
 
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase).C(record)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		record := Record{}
 		recordOld := Record{}
@@ -323,9 +330,11 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
 func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase).C(blocks)
-	s := dao.client[r].DB(metabase).C(shards)
-	t := dao.client[r].DB(metabase).C(record)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(blocks)
+	s := sess.DB(metabase).C(shards)
+	t := sess.DB(metabase).C(record)
 	var blocks []Block
 	fmt.Println("snAttrs:", snAttrs, " ,start:", start, ",end:", end, ",sn:", sn)
 
@@ -414,7 +423,9 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 	var result []*Record
 	num := int(countnum)
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase).C(record)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(record)
 	for i := 0; i < num; i++ {
 		r := new(Record)
 		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
@@ -440,9 +451,13 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 		// executor.InitPoolTask()
 		go func() {
 			for coroutinesNumber > 0 {
+				r := rand.Intn(len(dao.client))
+				sess := dao.client[r].Copy()
+				c := sess.DB(metabase).C("record")
 				rnm := new(Record)
 				c.Find(bson.M{"sn": re.Sn}).Sort("-1").Limit(1).One(rnm)
 				executor.start(addr, rnm.StartTime, rnm.EndTime, executor.Snid)
+				sess.Close()
 			}
 		}()
 
@@ -504,7 +519,9 @@ func (dao *Dao) GetShardsCount(g *gin.Context) {
 	metabase_db := dao.cfg.GetConfigInfo("db")
 
 	r := rand.Intn(len(dao.client))
-	c := dao.client[r].DB(metabase_db).C(blocks)
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase_db).C(blocks)
 	var blocks []Block
 	// messages := Messages{}
 	start := g.Query("start")
