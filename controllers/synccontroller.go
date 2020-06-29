@@ -50,13 +50,15 @@ func (dao *Dao) GetTimeStamp(g *gin.Context) {
 	g.String(200, "时间戳："+timeStamp)
 }
 
+//GetBlocksByTimes 服务端查询接口
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
-	metabase_db := dao.cfg.GetConfigInfo("db")
+	metabaseDb := dao.cfg.GetConfigInfo("db")
 
 	r := rand.Intn(len(dao.client))
 	sess := dao.client[r].Copy()
-	c := sess.DB(metabase_db).C(blocks)
-	s := sess.DB(metabase_db).C(shards)
+	defer sess.Close()
+	c := sess.DB(metabaseDb).C(blocks)
+	s := sess.DB(metabaseDb).C(shards)
 	var blocks []Block
 	var shards []Shard
 	var result []Block
