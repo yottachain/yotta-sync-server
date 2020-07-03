@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -235,10 +236,20 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 
 			for _, ss := range bb.Shards {
 				ss.BlockID = b.ID
+				// sds = append(sds, ss)
 				items = append(items, ss)
 			}
-
 		}
+
+		//对shards进行排序
+
+		sort.Sort(ShardSlice(items))
+
+		// fmt.Printf("items: %+v\n", items)
+		// for _, sdddd := range items {
+		// 	fmt.Println("NodeID=", sdddd.(*Shard).NodeID)
+		// }
+
 		time66 := time.Now().UnixNano()
 		fmt.Println("Insert Shards before,", "SN:", executor.Snid, ",time3:", time66, ",Shards len:", len(items), ",take times:", (time66-time55)/100000, "ms")
 		errS := s.Insert(items...)
@@ -252,6 +263,18 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 		time77 := time.Now().UnixNano()
 		fmt.Println("Insert Shards complete,", "SN:", executor.Snid, ",time4:", time66, "Shards len:", len(items), ",Insert shards take times:", (time77-time66)/100000, "ms")
 	}
+}
+
+type ShardSlice []interface{}
+
+func (a ShardSlice) Len() int { // 重写 Len() 方法
+	return len(a)
+}
+func (a ShardSlice) Swap(i, j int) { // 重写 Swap() 方法
+	a[i], a[j] = a[j], a[i]
+}
+func (a ShardSlice) Less(i, j int) bool { // 重写 Less() 方法， 升序排序
+	return a[j].(*Shard).NodeID > a[i].(*Shard).NodeID
 }
 
 // saveBlocksToFile 将拉取的数据保存到本地
