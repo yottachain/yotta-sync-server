@@ -37,6 +37,7 @@ func (dao *Dao) GetIDByTimestamp(g *gin.Context) {
 	g.String(200, "ID=%s", fmt.Sprintf("%d", ID))
 }
 
+//GetTimeStamp 根据ID获取时间戳
 func (dao *Dao) GetTimeStamp(g *gin.Context) {
 	blockID := g.Query("blockID")
 	fmt.Println("blockID::::::::::", blockID)
