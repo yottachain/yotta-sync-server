@@ -165,7 +165,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 		err = json.Unmarshal(body, &blocks)
 	}
 	time22 := time.Now().UnixNano()
-	fmt.Println("Pull complete,", "SN:", sn, ",pull end time:", time22, ",pull data take times:", (time22-time11)/100000, "ms")
+	fmt.Println("Pull complete,", "Block size:", len(blocks), ",SN:", sn, ",pull end time:", time22, ",pull data take times:", (time22-time11)/100000, "ms")
 	// fmt.Println("blocks len:::::::::::::::::::", len(blocks))
 	record := Record{}
 	entTime, err3 := strconv.ParseInt(endc, 10, 32)
@@ -189,7 +189,7 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
 	err5 := t.Update(selector, data)
 	if err5 != nil {
-		fmt.Println(err5)
+		fmt.Println("update record failure ", err5)
 	}
 
 	time33 := time.Now().UnixNano()
