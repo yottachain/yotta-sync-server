@@ -13,6 +13,14 @@ import (
 // 	AR  int32 `bson:"AR"`
 // }
 
+//metabase.shards_rebuild表结构
+type ShardRebuidMeta struct {
+	ID        int64 `bson:"_id"`
+	VFI       int64 `bson:"VFI"`
+	NewNodeId int32 `bson:"nid"`
+	OldNodeId int32 `bson:"sid"`
+}
+
 //WriteShard 用于写入到数据库
 type WriteShard struct {
 	ID      int64            `bson:"_id"`
@@ -30,6 +38,13 @@ type Messages struct {
 //Record 同步信息记录表
 type Record struct {
 	// ID        int64 `bson:"_id" json:"_id"`
+	StartTime int32 `bson:"start" json:"start"`
+	EndTime   int32 `bson:"end" json:"end"`
+	Sn        int   `bson:"sn" json:"sn"`
+}
+
+//ShardRecord 同步信息记录表
+type ShardRecord struct {
 	StartTime int32 `bson:"start" json:"start"`
 	EndTime   int32 `bson:"end" json:"end"`
 	Sn        int   `bson:"sn" json:"sn"`

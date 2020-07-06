@@ -51,6 +51,36 @@ func (dao *Dao) GetTimeStamp(g *gin.Context) {
 	g.String(200, "时间戳："+timeStamp)
 }
 
+//GetShardRebuidMetaSByTime 根据时间段获取重建分片信息
+func (dao *Dao) GetShardRebuidMetaSByTime(g *gin.Context) {
+	metabaseDb := dao.cfg.GetConfigInfo("db")
+	r := rand.Intn(len(dao.client))
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabaseDb).C(shardsRebuild)
+	var shards []ShardRebuidMeta
+	start := g.Query("start")
+	end := g.Query("end")
+	min, err := strconv.ParseInt(start, 10, 32)
+	max, err := strconv.ParseInt(end, 10, 32)
+	CheckErr(err)
+	min32 := int32(min)
+	max32 := int32(max)
+	//将时间戳转byte
+	minbyte := Int32ToBytes(min32)
+	maxbyte := Int32ToBytes(max32)
+	ee := []byte{0x00, 0x00, 0x00, 0x00}
+	mindata := [][]byte{minbyte, ee}
+	maxdata := [][]byte{maxbyte, ee}
+	mindatas := bytes.Join(mindata, []byte{})
+	maxdatas := bytes.Join(maxdata, []byte{})
+	min64 := BytesToInt64(mindatas)
+	max64 := BytesToInt64(maxdatas)
+	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&shards)
+
+	g.JSON(200, shards)
+}
+
 //GetBlocksByTimes 服务端查询接口
 func (dao *Dao) GetBlocksByTimes(g *gin.Context) {
 	metabaseDb := dao.cfg.GetConfigInfo("db")
@@ -330,6 +360,37 @@ func CreateInitRecord(start, interval string, num int, dao *Dao) {
 
 }
 
+//CreateInitShardRecord 创建重建更新记录
+func CreateInitShardRecord(start, interval string, num int, dao *Dao) {
+
+	min, err := strconv.ParseInt(start, 10, 32)
+	time32, err := strconv.ParseInt(interval, 10, 32)
+	max := min + time32
+	CheckErr(err)
+	min32 := int32(min)
+	max32 := int32(max)
+
+	r := rand.Intn(len(dao.client))
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(shardRecord)
+	for i := 0; i < num; i++ {
+		record := ShardRecord{}
+		recordOld := ShardRecord{}
+		record.StartTime = min32
+		record.EndTime = max32
+		record.Sn = i
+		c.Find(bson.M{"sn": i}).One(&recordOld)
+		if recordOld.StartTime == 0 {
+			fmt.Println("Init Shard record table ...", record.Sn)
+			c.Insert(&record)
+			fmt.Println("Init Shard record data add complete...")
+		}
+
+	}
+
+}
+
 //insertBlocksAndShardsFromService 通过传递要请求的服务器地址，开始时间结束时间 以及sn同步数据并记录record
 func (dao *Dao) insertBlocksAndShardsFromService(snAttrs, start, end string, sn int) {
 	r := rand.Intn(len(dao.client))
@@ -519,12 +580,12 @@ func RunService(wg *sync.WaitGroup, cfg *conf.Config) {
 
 //GetShardsCount 获取真实分片数量
 func (dao *Dao) GetShardsCount(g *gin.Context) {
-	metabase_db := dao.cfg.GetConfigInfo("db")
+	metabaseDb := dao.cfg.GetConfigInfo("db")
 
 	r := rand.Intn(len(dao.client))
 	sess := dao.client[r].Copy()
 	defer sess.Close()
-	c := sess.DB(metabase_db).C(blocks)
+	c := sess.DB(metabaseDb).C(blocks)
 	var blocks []Block
 	// messages := Messages{}
 	start := g.Query("start")
@@ -541,4 +602,62 @@ func (dao *Dao) GetShardsCount(g *gin.Context) {
 	fmt.Println("count:", count)
 
 	g.String(200, "shardsCount=%s", fmt.Sprintf("%d", count))
+}
+
+//RunRebulidService 启动线程函数
+func RunRebulidService(wg *sync.WaitGroup, cfg *conf.Config) {
+	fmt.Println("RunRebulidService.........")
+	dao, err := InitDao(cfg.GetRecieveInfo("url"), cfg)
+	if err != nil {
+		panic(err)
+	}
+	sncount := cfg.GetRecieveInfo("sncount")
+	countnum, err := strconv.ParseInt(sncount, 10, 32)
+	sleetTime1 := cfg.GetRecieveInfo("sleep")
+	sleepTime2, err := strconv.ParseInt(sleetTime1, 10, 32)
+	if err != nil {
+
+	}
+	var result []*ShardRecord
+	num := int(countnum)
+	r := rand.Intn(len(dao.client))
+	sess := dao.client[r].Copy()
+	defer sess.Close()
+	c := sess.DB(metabase).C(shardRecord)
+	for i := 0; i < num; i++ {
+		r := new(ShardRecord)
+		c.Find(bson.M{"sn": i}).Sort("-1").Limit(1).One(r)
+		result = append(result, r)
+	}
+	timec := cfg.GetRecieveInfo("time")
+	time32, err := strconv.ParseInt(timec, 10, 32)
+	coroutinesNumber1 := cfg.GetRecieveInfo("coroutinesNumber")
+	coroutinesNumber32, err := strconv.ParseInt(coroutinesNumber1, 10, 32)
+	coroutinesNumber := int(coroutinesNumber32)
+	for _, record := range result {
+		re := record
+		var executor Executor
+		addr := cfg.GetRecieveInfo("addrs" + fmt.Sprintf("%d", re.Sn))
+		executor.AddURL = addr
+		executor.TimeC = int(time32)
+		executor.SleepTime = int(sleepTime2)
+		executor.Snid = re.Sn
+		pool := grpool.NewPool(coroutinesNumber, 0)
+		executor.Pool = pool
+		executor.dao = dao
+
+		// executor.InitPoolTask()
+		go func() {
+			for coroutinesNumber > 0 {
+				r := rand.Intn(len(dao.client))
+				sess := dao.client[r].Copy()
+				c := sess.DB(metabase).C(shardRecord)
+				rnm := new(ShardRecord)
+				c.Find(bson.M{"sn": re.Sn}).Sort("-1").Limit(1).One(rnm)
+				executor.update(addr, rnm.StartTime, rnm.EndTime, executor.Snid)
+				sess.Close()
+			}
+		}()
+	}
+
 }

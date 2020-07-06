@@ -21,16 +21,16 @@ import (
 // 	blocks *[]Block
 // }
 
+//Executor 参数传递
 type Executor struct {
-	// StartTime string
-	// EndTime   string
-	Snid      int
-	AddURL    string
-	TimeC     int
-	SleepTime int
-	Pool      *grpool.Pool
-	dao       *Dao
-	blocks    []Block
+	Snid            int
+	AddURL          string
+	TimeC           int
+	SleepTime       int
+	Pool            *grpool.Pool
+	dao             *Dao
+	blocks          []Block
+	ShardRebuidMeta []ShardRebuidMeta
 }
 
 func (executor *Executor) start(addr string, start, end int32, snid int) {
@@ -50,6 +50,14 @@ func (executor *Executor) start(addr string, start, end int32, snid int) {
 	// }
 }
 
+func (executor *Executor) update(addr string, start, end int32, snid int) {
+	executor.ShardRebuidMeta = executor.PullShardRebuidMetas(addr, start, end, snid)
+	bs := executor.ShardRebuidMeta
+	executor.UpdateShards(bs)
+
+}
+
+//PullBlocksAndShardsByTimes old pull
 func (executor *Executor) PullBlocksAndShardsByTimes(snAttrs string, sn int) {
 
 	fmt.Println("Goroutine ", sn)
@@ -195,6 +203,106 @@ func (executor *Executor) PullBlocksAndShards(snAttrs string, startTime, endTime
 	time33 := time.Now().UnixNano()
 	fmt.Println("update record complete,", "SN:", sn, ",update record complete time:", time33, ",update record take times:", (time33-time22)/100000, "ms")
 	return blocks
+}
+
+//PullShardRebuidMetas 拉取重建分片数据
+func (executor *Executor) PullShardRebuidMetas(snAttrs string, startTime, endTime int32, sn int) []ShardRebuidMeta {
+	fmt.Println("Goroutine ", sn)
+
+	startc := fmt.Sprintf("%d", startTime)
+	endc := fmt.Sprintf("%d", endTime)
+	sess := executor.dao.client[0].Copy()
+	defer sess.Close()
+	t := sess.DB("metabase").C(shardRecord)
+	r := new(ShardRecord)
+	t.Find(bson.M{"sn": r.Sn}).Sort("-1").Limit(1).One(r)
+
+	now1 := time.Now().Unix() - int64(executor.TimeC)
+
+	if now1 < int64(endTime) {
+		// 比较时间戳，如果发现当前时间比查询的endTime值小，让程序休眠10分钟继续
+		fmt.Println("同步结束时间大于系统时间，程序进入休眠状态，自动唤醒时间：", executor.SleepTime, " 分钟后")
+		time.Sleep(time.Minute * time.Duration(executor.SleepTime))
+	}
+
+	var shardRebuidMetas []ShardRebuidMeta
+	fmt.Println("snAttrs:", snAttrs, " ,start:", startTime, ",end:", endTime, ",sn:", sn)
+	time11 := time.Now().UnixNano()
+	fmt.Println("Pull start,", "SN:", sn, "pull start time:", time11)
+	//生成要访问的url
+	url := snAttrs + "/sync/getShardRebuidMetas?start=" + startc + "&end=" + endc
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		fmt.Println("sn", sn, ",Error getting sn data  ", snAttrs)
+		var retry int = 0
+		for retry != 5 {
+			resp, err = http.Get(url)
+			if err != nil {
+				time.Sleep(time.Minute * time.Duration(executor.SleepTime))
+			} else {
+				retry = 5
+			}
+		}
+
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		err = json.Unmarshal(body, &shardRebuidMetas)
+	}
+	time22 := time.Now().UnixNano()
+	fmt.Println("Pull complete,", "ShardRebuidMeta size:", len(shardRebuidMetas), ",SN:", sn, ",pull end time:", time22, ",pull data take times:", (time22-time11)/100000, "ms")
+	// fmt.Println("blocks len:::::::::::::::::::", len(blocks))
+	record := ShardRecord{}
+	entTime, err3 := strconv.ParseInt(endc, 10, 32)
+	CheckErr(err3)
+	time1 := executor.dao.cfg.GetRecieveInfo("time")
+	time32, err4 := strconv.ParseInt(time1, 10, 32)
+	CheckErr(err4)
+	min32 := int32(entTime)
+	max32 := int32(entTime) + int32(time32)
+
+	record.StartTime = min32
+	record.EndTime = max32
+	if record.StartTime == 0 {
+		startTime1 := executor.dao.cfg.GetRecieveInfo("start")
+		reStartTime, _ := strconv.ParseInt(startTime1, 10, 32)
+		record.StartTime = int32(reStartTime)
+		record.EndTime = int32(reStartTime) + int32(time32)
+	}
+	record.Sn = sn
+	selector := bson.M{"sn": record.Sn}
+	data := bson.M{"start": record.StartTime, "end": record.EndTime, "sn": record.Sn}
+	err5 := t.Update(selector, data)
+	if err5 != nil {
+		fmt.Println("update record failure ", err5)
+	}
+
+	time33 := time.Now().UnixNano()
+	fmt.Println("update ShardRecord complete,", "SN:", sn, ",update ShardRecord complete time:", time33, ",update ShardRecord take times:", (time33-time22)/100000, "ms")
+	return shardRebuidMetas
+}
+
+//UpdateShards 更新Shard数据
+func (executor *Executor) UpdateShards(shardRebuidMetas []ShardRebuidMeta) {
+	r := rand.Intn(len(executor.dao.client))
+	sess := executor.dao.client[r].Copy()
+	defer sess.Close()
+	s := sess.DB(metabase).C(shards)
+	if len(shardRebuidMetas) > 0 {
+		for _, shardRebuidMeta := range shardRebuidMetas {
+			log.Printf("更新重建后分片信息，分片的ID:%d,更新前矿机ID:%d ,更新前后矿机ID:%d\n", shardRebuidMeta.VFI, shardRebuidMeta.OldNodeId, shardRebuidMeta.NewNodeId)
+			selector := bson.M{"_id": shardRebuidMeta.VFI}
+			data := bson.M{"nodeId": shardRebuidMeta.NewNodeId}
+			err := s.Update(selector, data)
+			if err != nil {
+				log.Printf("重建数据更新失败,ShardID:  %+v\n", shardRebuidMeta.VFI)
+			}
+		}
+
+	}
 }
 
 //InsertBlockAndShard 插入block shard
