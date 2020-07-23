@@ -55,6 +55,7 @@ type Block struct {
 	ID     int64    `bson:"_id" json:"_id"`
 	VNF    int32    `bson:"VNF" json:"VNF"`
 	AR     int32    `bson:"AR" json:"AR"`
+	SnID   int      `bson:"snId" json:"snId"`
 	Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
 }
 

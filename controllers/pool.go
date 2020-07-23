@@ -321,6 +321,7 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			n.ID = b.ID
 			n.AR = b.AR
 			n.VNF = b.VNF
+			n.SnID = executor.Snid
 			itemsBlocks = append(itemsBlocks, n)
 		}
 		errB := c.Insert(itemsBlocks...)
@@ -341,7 +342,6 @@ func (executor *Executor) InsertBlockAndShard(blocks []Block) {
 			b.ID = bb.ID
 			b.AR = bb.AR
 			b.VNF = bb.VNF
-
 			for _, ss := range bb.Shards {
 				ss.BlockID = b.ID
 				// sds = append(sds, ss)
