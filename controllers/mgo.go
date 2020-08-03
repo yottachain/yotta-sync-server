@@ -10,10 +10,12 @@ import (
 )
 
 const (
-	metabase = "metabase"
-	shards   = "shards"
-	blocks   = "blocks"
-	record   = "record"
+	metabase      = "metabase"
+	shards        = "shards"
+	blocks        = "blocks"
+	record        = "record"
+	shardsRebuild = "shards_rebuild"
+	shardRecord   = "shard_record"
 )
 
 type Dao struct {

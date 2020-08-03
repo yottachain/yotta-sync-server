@@ -24,7 +24,7 @@ func InitRouter(cfg *conf.Config, wg *sync.WaitGroup) (router *gin.Engine) {
 	}
 	service := cfg.GetRecieveInfo("service")
 
-	if service == "off" {
+	if service == "client" {
 		start := cfg.GetRecieveInfo("start")
 		interval := cfg.GetRecieveInfo("time")
 		sncount := cfg.GetRecieveInfo("sncount")
@@ -41,6 +41,22 @@ func InitRouter(cfg *conf.Config, wg *sync.WaitGroup) (router *gin.Engine) {
 		wg.Wait()
 		return
 
+	} else if service == "rebuild" {
+		start := cfg.GetRecieveInfo("start")
+		interval := cfg.GetRecieveInfo("time")
+		sncount := cfg.GetRecieveInfo("sncount")
+		countnum, err := strconv.ParseInt(sncount, 10, 32)
+		if err != nil {
+		}
+		num := int(countnum)
+		controllers.CreateInitShardRecord(start, interval, num, dao)
+
+		wg := &sync.WaitGroup{}
+		fmt.Println("Start Thread service ..............")
+
+		controllers.RunRebulidService(wg, cfg)
+		wg.Wait()
+		return
 	}
 
 	v1 := router.Group("/sync")
@@ -52,6 +68,7 @@ func InitRouter(cfg *conf.Config, wg *sync.WaitGroup) (router *gin.Engine) {
 			v1.GET("/get_timeStamp", dao.GetTimeStamp)
 			v1.GET("/getIDByTime", dao.GetIDByTimestamp)
 			v1.GET("/getShardsCount", dao.GetShardsCount)
+			v1.GET("/getShardRebuidMetas", dao.GetShardRebuidMetaSByTime)
 		}
 	}
 

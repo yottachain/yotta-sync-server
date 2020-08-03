@@ -13,6 +13,14 @@ import (
 // 	AR  int32 `bson:"AR"`
 // }
 
+//metabase.shards_rebuild表结构
+type ShardRebuidMeta struct {
+	ID        int64 `bson:"_id"`
+	VFI       int64 `bson:"VFI"`
+	NewNodeId int32 `bson:"nid"`
+	OldNodeId int32 `bson:"sid"`
+}
+
 //WriteShard 用于写入到数据库
 type WriteShard struct {
 	ID      int64            `bson:"_id"`
@@ -35,11 +43,19 @@ type Record struct {
 	Sn        int   `bson:"sn" json:"sn"`
 }
 
+//ShardRecord 同步信息记录表
+type ShardRecord struct {
+	StartTime int32 `bson:"start" json:"start"`
+	EndTime   int32 `bson:"end" json:"end"`
+	Sn        int   `bson:"sn" json:"sn"`
+}
+
 //Block 数据块id及分片数量
 type Block struct {
 	ID     int64    `bson:"_id" json:"_id"`
 	VNF    int32    `bson:"VNF" json:"VNF"`
 	AR     int32    `bson:"AR" json:"AR"`
+	SnID   int      `bson:"snId" json:"snId"`
 	Shards []*Shard `bson:"shards,omitempty" json:"shards,omitempty"`
 }
 
