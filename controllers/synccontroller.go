@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -61,24 +62,46 @@ func (dao *Dao) GetShardRebuidMetaSByTime(g *gin.Context) {
 	var shards []ShardRebuidMeta
 	start := g.Query("start")
 	end := g.Query("end")
-	min, err := strconv.ParseInt(start, 10, 32)
-	max, err := strconv.ParseInt(end, 10, 32)
-	CheckErr(err)
-	min32 := int32(min)
-	max32 := int32(max)
-	//将时间戳转byte
-	minbyte := Int32ToBytes(min32)
-	maxbyte := Int32ToBytes(max32)
-	ee := []byte{0x00, 0x00, 0x00, 0x00}
-	mindata := [][]byte{minbyte, ee}
-	maxdata := [][]byte{maxbyte, ee}
-	mindatas := bytes.Join(mindata, []byte{})
-	maxdatas := bytes.Join(maxdata, []byte{})
-	min64 := BytesToInt64(mindatas)
-	max64 := BytesToInt64(maxdatas)
-	c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&shards)
-
-	g.JSON(200, shards)
+	if end != "" {
+		min, err := strconv.ParseInt(start, 10, 32)
+		max, err := strconv.ParseInt(end, 10, 32)
+		CheckErr(err)
+		min32 := int32(min)
+		max32 := int32(max)
+		//将时间戳转byte
+		minbyte := Int32ToBytes(min32)
+		maxbyte := Int32ToBytes(max32)
+		ee := []byte{0x00, 0x00, 0x00, 0x00}
+		mindata := [][]byte{minbyte, ee}
+		maxdata := [][]byte{maxbyte, ee}
+		mindatas := bytes.Join(mindata, []byte{})
+		maxdatas := bytes.Join(maxdata, []byte{})
+		min64 := BytesToInt64(mindatas)
+		max64 := BytesToInt64(maxdatas)
+		err = c.Find(bson.M{"_id": bson.M{"$lte": max64, "$gt": min64}}).Sort("_id").All(&shards)
+		if err != nil {
+			g.AbortWithError(500, err)
+		} else {
+			g.JSON(200, shards)
+		}
+	} else {
+		count := g.Query("count")
+		min, err := strconv.ParseInt(start, 10, 64)
+		cnt, err := strconv.ParseInt(count, 10, 32)
+		log.Printf("get shards rebuilt from %d: %d\n", min, cnt)
+		CheckErr(err)
+		count32 := int(cnt)
+		err = c.Find(bson.M{"_id": bson.M{"$gte": min}}).Sort("_id").Limit(count32).All(&shards)
+		if err != nil {
+			g.AbortWithError(500, err)
+		} else {
+			if shards == nil {
+				g.JSON(200, make([]ShardRebuidMeta, 0))
+			} else {
+				g.JSON(200, shards)
+			}
+		}
+	}
 }
 
 //GetBlocksByTimes 服务端查询接口
