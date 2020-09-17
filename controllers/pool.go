@@ -294,7 +294,7 @@ func (executor *Executor) UpdateShards(shardRebuidMetas []ShardRebuidMeta) {
 	if len(shardRebuidMetas) > 0 {
 		for _, shardRebuidMeta := range shardRebuidMetas {
 			log.Printf("更新重建后分片信息，分片的ID:%d,更新前矿机ID:%d ,更新前后矿机ID:%d\n", shardRebuidMeta.VFI, shardRebuidMeta.OldNodeId, shardRebuidMeta.NewNodeId)
-			selector := bson.M{"_id": shardRebuidMeta.VFI}
+			selector := bson.M{"_id": shardRebuidMeta.VFI, "nodeId": shardRebuidMeta.OldNodeId}
 			data := bson.M{"$set": bson.M{"nodeId": shardRebuidMeta.NewNodeId}}
 			// data := bson.M{"nodeId": shardRebuidMeta.NewNodeId}
 			err := s.Update(selector, data)
