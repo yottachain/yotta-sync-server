@@ -12,9 +12,9 @@ import (
 	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
 	"github.com/tylerb/graceful"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
 
 //Server server struct
@@ -161,12 +161,10 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 		resp.Blocks = blocks[0 : size-1]
 		resp.More = true
 		resp.Size = size - 1
-		//resp.Next = blocks[len(blocks)-1].ID
 	} else {
 		resp.Blocks = blocks
 		resp.More = false
 		resp.Size = int64(len(resp.Blocks))
-		//resp.Next = resp.Blocks[len(resp.Blocks)-1].ID + int64(resp.Blocks[len(resp.Blocks)-1].VNF)
 	}
 	resp.Next = resp.Blocks[len(resp.Blocks)-1].ID + int64(resp.Blocks[len(resp.Blocks)-1].VNF)
 	var innerErr *error
