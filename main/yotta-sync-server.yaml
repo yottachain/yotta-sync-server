@@ -1,0 +1,22 @@
+server:
+  bind-addr: ":8080"
+  mongodb-url: "mongodb://127.0.0.1:27017/?connect=direct"
+  db-name: "metabase"
+  sn-id: 0
+client:
+  mongodb-url: "mongodb://127.0.0.1:27017/?retryWrites=true"
+  db-name: "metabase"
+  all-sync-urls:
+  - "http://127.0.0.1:8051"
+  - "http://127.0.0.1:8052"
+  - "http://127.0.0.1:8053"
+  start-time: 0
+  batch-size: 10000
+  wait-time: 30
+  skip-time: 300
+logger:
+  output: "file"
+  file-path: "./sync.log"
+  rotation-time: 24
+  max-age: 240
+  level: "Info"
