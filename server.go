@@ -25,13 +25,14 @@ type Server struct {
 
 //ServerDao data access object of server
 type ServerDao struct {
-	dbCli  *mongo.Client
-	dbName string
-	SNID   int
+	dbCli    *mongo.Client
+	dbName   string
+	SNID     int
+	SkipTime int
 }
 
 //NewServer create new server instance
-func NewServer(ctx context.Context, mongoDBURL, dbName string, snID int) (*Server, error) {
+func NewServer(ctx context.Context, mongoDBURL, dbName string, snID, skipTime int) (*Server, error) {
 	entry := log.WithFields(log.Fields{Function: "NewServer"})
 	dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoDBURL))
 	if err != nil {
@@ -40,7 +41,7 @@ func NewServer(ctx context.Context, mongoDBURL, dbName string, snID int) (*Serve
 	}
 	entry.Infof("mongoDB connected: %s", mongoDBURL)
 	server := echo.New()
-	return &Server{server: server, dao: &ServerDao{dbCli: dbClient, dbName: dbName, SNID: snID}}, nil
+	return &Server{server: server, dao: &ServerDao{dbCli: dbClient, dbName: dbName, SNID: snID, SkipTime: skipTime}}, nil
 }
 
 //StartServer HTTP server
@@ -53,6 +54,7 @@ func (server *Server) StartServer(bindAddr string) error {
 	}))
 	server.server.GET("sync/getSyncData", server.GetSyncData)
 	server.server.GET("sync/getShardRebuildMetas", server.GetRebuildData)
+	server.server.GET("sync/GetStoredShards", server.GetStoredShards)
 	server.server.Server.Addr = bindAddr
 	err := graceful.ListenAndServe(server.server.Server, 5*time.Second)
 	if err != nil {
@@ -72,6 +74,12 @@ type SyncQuery struct {
 type RebuildQuery struct {
 	Start int64 `json:"start" form:"start" query:"start"`
 	Count int64 `json:"count" form:"count" query:"count"`
+}
+
+//StoredShardsQuery struct
+type StoredShardsQuery struct {
+	From int32 `json:"from" form:"from" query:"from"`
+	To   int32 `json:"to" form:"to" query:"to"`
 }
 
 //GetSyncData fetch sync data
@@ -106,6 +114,36 @@ func (server *Server) GetRebuildData(c echo.Context) error {
 	}
 	if resp == nil {
 		resp = make([]*ShardRebuildMeta, 0)
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
+}
+
+//GetStoredShards fetch stored shards
+func (server *Server) GetStoredShards(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetStoredShards"})
+	q := new(StoredShardsQuery)
+	if err := c.Bind(q); err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if int64(q.To) > time.Now().Unix()-int64(server.dao.SkipTime) {
+		return c.String(http.StatusInternalServerError, "time range is invalid")
+	}
+	padding := []byte{0x00, 0x00, 0x00, 0x00}
+	fromByte32 := Int32ToBytes(q.From)
+	from64 := BytesToInt64(append(fromByte32, padding...))
+	toByte32 := Int32ToBytes(q.To)
+	to64 := BytesToInt64(append(toByte32, padding...))
+	resp, err := server.dao.GetStoredShards(context.Background(), from64, to64)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if resp == nil {
+		resp = make([]*Shard, 0)
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -283,4 +321,79 @@ func (dao *ServerDao) GetRebuildData(ctx context.Context, start, count int64) ([
 		rebuilds = append(rebuilds, rshard)
 	}
 	return rebuilds, nil
+}
+
+//GetStoredShards get stored shards in period
+func (dao *ServerDao) GetStoredShards(ctx context.Context, from, to int64) ([]*Shard, error) {
+	entry := log.WithFields(log.Fields{Function: "GetStoredShards"})
+	if from < 0 || to < 0 || from >= to {
+		err := fmt.Errorf("invalid parameters: from -> %d, to -> %d", from, to)
+		entry.WithError(err).Error("invalid parameters")
+		return nil, err
+	}
+	shardsTab := dao.dbCli.Database(dao.dbName).Collection(ShardsTab)
+	rebuildTab := dao.dbCli.Database(dao.dbName).Collection(ShardsRebuildTab)
+	shards1 := make([]*Shard, 0)
+	shards2 := make([]*Shard, 0)
+	var innerErr *error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		//fetch shards
+		defer wg.Done()
+		opts := new(options.FindOptions)
+		opts.Sort = bson.M{"_id": 1}
+		sCur, err := shardsTab.Find(ctx, bson.M{"_id": bson.M{"$gte": from, "$lt": to}}, opts)
+		if err != nil {
+			entry.WithError(err).Errorf("traversal shards: from -> %d, to -> %d", from, to)
+			innerErr = &err
+			return
+		}
+		defer sCur.Close(ctx)
+		for sCur.Next(ctx) {
+			shard := new(Shard)
+			err := sCur.Decode(shard)
+			if err != nil {
+				entry.WithError(err).Errorf("decoding shard failed: from -> %d, to -> %d", from, to)
+				innerErr = &err
+				return
+			}
+			shards1 = append(shards1, shard)
+		}
+	}()
+	go func() {
+		//fetch rebuilt shards
+		defer wg.Done()
+		opts := new(options.FindOptions)
+		opts.Sort = bson.M{"_id": 1}
+		rCur, err := rebuildTab.Find(ctx, bson.M{"_id": bson.M{"$gte": from, "$lt": to}}, opts)
+		if err != nil {
+			entry.WithError(err).Errorf("traversal rebuild shards: from -> %d, to -> %d", from, to)
+			innerErr = &err
+			return
+		}
+		defer rCur.Close(ctx)
+		for rCur.Next(ctx) {
+			rshard := new(ShardRebuildMeta)
+			err := rCur.Decode(rshard)
+			if err != nil {
+				entry.WithError(err).Errorf("decoding rebuild metadata failed: from -> %d, to -> %d", from, to)
+				innerErr = &err
+				return
+			}
+			shard := new(Shard)
+			err = shardsTab.FindOne(ctx, bson.M{"_id": rshard.VFI}).Decode(shard)
+			if err != nil {
+				entry.WithError(err).Errorf("decoding shard %d failed: from -> %d, to -> %d", rshard.VFI, from, to)
+				innerErr = &err
+				return
+			}
+			shards2 = append(shards2, shard)
+		}
+	}()
+	wg.Wait()
+	if innerErr != nil {
+		return nil, *innerErr
+	}
+	return append(shards1, shards2...), nil
 }

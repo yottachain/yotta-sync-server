@@ -9,6 +9,8 @@ const (
 	ServerDBNameField = "server.db-name"
 	//ServerSNIDField field name of server.sn-id
 	ServerSNIDField = "server.sn-id"
+	//ServerSkipTimeField Field name of server.skip-time
+	ServerSkipTimeField = "server.skip-time"
 
 	//ClientMongoDBURLField field name of client.mongodb-url
 	ClientMongoDBURLField = "client.mongodb-url"
@@ -50,6 +52,7 @@ type ServerConfig struct {
 	MongoDBURL string `mapstructure:"mongodb-url"`
 	DBName     string `mapstructure:"db-name"`
 	SNID       int    `mapstructure:"sn-id"`
+	SkipTime   int    `mapstructure:"skip-time"`
 }
 
 //ClientConfig client configuration
