@@ -25,11 +25,11 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		config := new(ytsync.Config)
-		if err := viper.Unmarshal(config); err != nil {
-			panic(fmt.Sprintf("unable to decode into config struct, %v\n", err))
-		}
-		initLog(config)
+		// config := new(ytsync.Config)
+		// if err := viper.Unmarshal(config); err != nil {
+		// 	panic(fmt.Sprintf("unable to decode into config struct, %v\n", err))
+		// }
+		// initLog(config)
 		// rebuilder, err := ytsync.New(config.AnalysisDBURL, config.RebuilderDBURL, config.AuraMQ, config.Compensation, config.MiscConfig)
 		// if err != nil {
 		// 	panic(fmt.Sprintf("fatal error when starting rebuilder service: %s\n", err))
@@ -148,6 +148,8 @@ var (
 	DefaultServerDBName string = "metabase"
 	//DefaultServerSNID default value of ServerSNID
 	DefaultServerSNID int = 0
+	//DefaultServerSkipTime default value of ServerSkipTime
+	DefaultServerSkipTime int = 180
 
 	//DefaultClientMongoDBURL default value of ClientMongoDBURL
 	DefaultClientMongoDBURL string = "mongodb://127.0.0.1:27017/?connect=direct"
@@ -158,7 +160,7 @@ var (
 	//DefaultClientStartTime default value of ClientStartTime
 	DefaultClientStartTime int32 = 0
 	//DefaultClientBatchSize default value of ClientBatchSize
-	DefaultClientBatchSize int = 10000
+	DefaultClientBatchSize int = 1000
 	//DefaultClientWaitTime default value of ClientWaitTime
 	DefaultClientWaitTime int = 60
 	//DefaultClientSkipTime default value of ClientSkipTime
@@ -186,6 +188,8 @@ func initFlag() {
 	viper.BindPFlag(ytsync.ServerDBNameField, rootCmd.PersistentFlags().Lookup(ytsync.ServerDBNameField))
 	rootCmd.PersistentFlags().Int(ytsync.ServerSNIDField, DefaultServerSNID, "SN index")
 	viper.BindPFlag(ytsync.ServerSNIDField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSNIDField))
+	rootCmd.PersistentFlags().Int(ytsync.ServerSkipTimeField, DefaultServerSkipTime, "ensure not to fetching stored shards till the end")
+	viper.BindPFlag(ytsync.ServerSkipTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSkipTimeField))
 	//client config
 	rootCmd.PersistentFlags().String(ytsync.ClientMongoDBURLField, DefaultClientMongoDBURL, "URL of destination mongoDB")
 	viper.BindPFlag(ytsync.ClientMongoDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMongoDBURLField))

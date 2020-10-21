@@ -17,6 +17,8 @@ server:
   db-name: "metabase"
   #所属SN编号
   sn-id: 0
+  #最近几分钟内的数据不进行同步，用于调用GetStoredShards接口时避免一致性问题，单位为秒
+  skip-time: 300
 #客户端配置
 client:
   #客户端的同步数据库URL

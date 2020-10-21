@@ -102,6 +102,7 @@ func (cli *Client) StartClient(ctx context.Context) error {
 						continue
 					}
 				}
+				entry.Debugf("ready for fetching sync data")
 				resp, err := GetSyncData(cli.httpCli, cli.SyncURLs[snID], checkPoint.Start, cli.BatchSize, cli.SkipTime)
 				if err != nil {
 					entry.WithError(err).Errorf("Get sync data of SN%d", snID)
@@ -135,6 +136,27 @@ func (cli *Client) StartClient(ctx context.Context) error {
 						result, err := blocksTab.InsertMany(ctx, ifBlocks, opt)
 						if result != nil {
 							entry.Infof("%d blocks inserted", len(result.InsertedIDs))
+							if err != nil {
+								//entry.WithError(err).Tracef("inserting blocks")
+								bulkException, ok := err.(mongo.BulkWriteException)
+								if ok {
+									if bulkException.WriteConcernError != nil {
+										entry.WithError(bulkException.WriteConcernError).Errorf("insert blocks of SN%d", snID)
+										innerErr = &err
+									} else {
+										for _, e := range bulkException.WriteErrors {
+											if e.Code != 11000 {
+												entry.WithError(e).Errorf("insert blocks of SN%d", snID)
+												innerErr = &err
+												break
+											}
+										}
+									}
+								} else {
+									entry.WithError(err).Errorf("insert blocks of SN%d", snID)
+									innerErr = &err
+								}
+							}
 						} else if err != nil {
 							entry.WithError(err).Errorf("insert blocks of SN%d", snID)
 							innerErr = &err
@@ -152,6 +174,27 @@ func (cli *Client) StartClient(ctx context.Context) error {
 						result, err := shardsTab.InsertMany(ctx, ifShards, opt)
 						if result != nil {
 							entry.Infof("%d shards inserted", len(result.InsertedIDs))
+							if err != nil {
+								//entry.WithError(err).Tracef("inserting shards")
+								bulkException, ok := err.(mongo.BulkWriteException)
+								if ok {
+									if bulkException.WriteConcernError != nil {
+										entry.WithError(bulkException.WriteConcernError).Errorf("insert shards of SN%d", snID)
+										innerErr = &err
+									} else {
+										for _, e := range bulkException.WriteErrors {
+											if e.Code != 11000 {
+												entry.WithError(e).Errorf("insert shards of SN%d", snID)
+												innerErr = &err
+												break
+											}
+										}
+									}
+								} else {
+									entry.WithError(err).Errorf("insert shards of SN%d", snID)
+									innerErr = &err
+								}
+							}
 						} else if err != nil {
 							entry.WithError(err).Errorf("insert shards of SN%d", snID)
 							innerErr = &err
@@ -188,6 +231,7 @@ func (cli *Client) StartClient(ctx context.Context) error {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("update checkpoint to %d", resp.Next)
 				if resp.More == false {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 				}
