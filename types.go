@@ -24,6 +24,8 @@ const (
 	CheckPointTab = "CheckPoint"
 	//RecordTab record table
 	RecordTab = "record"
+	//CorruptBlockTab block_corrupt table
+	CorruptBlockTab = "block_corrupt"
 )
 
 //Block struct
