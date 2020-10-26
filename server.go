@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -163,6 +164,7 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 	}
 	resp := &DataResp{SNID: dao.SNID, From: from, Blocks: make([]*Block, 0), Shards: make([]*Shard, 0), Rebuilds: make([]*ShardRebuildMeta, 0)}
 	blockTab := dao.dbCli.Database(dao.dbName).Collection(BlocksTab)
+	corruptBlockTab := dao.dbCli.Database(dao.dbName).Collection(CorruptBlockTab)
 	shardsTab := dao.dbCli.Database(dao.dbName).Collection(ShardsTab)
 	rebuildTab := dao.dbCli.Database(dao.dbName).Collection(ShardsRebuildTab)
 	//fetch blocks
@@ -173,7 +175,7 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 	skipByte32 := Int32ToBytes(int32(time.Now().Unix() - skip))
 	padding := []byte{0x00, 0x00, 0x00, 0x00}
 	skipTime64 := BytesToInt64(append(skipByte32, padding...))
-	bCur, err := blockTab.Find(ctx, bson.M{"_id": bson.M{"$gte": from, "$lt": skipTime64}}, opts)
+	bCur, err := blockTab.Find(ctx, bson.M{"_id": bson.M{"$gte": from, "$lt": skipTime64}, "corrupt": bson.M{"$exists": false}}, opts)
 	if err != nil {
 		entry.WithError(err).Errorf("traversal blocks: from -> %d, size -> %d, skip -> %d", from, size, skip)
 		return nil, err
@@ -240,6 +242,15 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 					err := fmt.Errorf("index of shards not match, block: %d", b.ID)
 					entry.WithError(err).Error("validate shards")
 					innerErr = &err
+					_, err2 := corruptBlockTab.InsertOne(ctx, b)
+					if err2 != nil && !strings.ContainsAny(err2.Error(), "duplicate key error") {
+						entry.WithError(err2).Error("insert corrupt block")
+						return
+					}
+					_, err2 = blockTab.UpdateOne(ctx, bson.M{"_id": b.ID}, bson.M{"$set": bson.M{"corrupt": 1}})
+					if err2 != nil {
+						entry.WithError(err).Error("add tag for corrupt block")
+					}
 					return
 				}
 				if i == shards[j].ID {
@@ -255,6 +266,15 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 				err := fmt.Errorf("lost shards of block: %d", b.ID)
 				entry.WithError(err).Error("validate shards")
 				innerErr = &err
+				_, err2 := corruptBlockTab.InsertOne(ctx, b)
+				if err2 != nil && !strings.ContainsAny(err2.Error(), "duplicate key error") {
+					entry.WithError(err2).Error("insert corrupt block")
+					return
+				}
+				_, err2 = blockTab.UpdateOne(ctx, bson.M{"_id": b.ID}, bson.M{"$set": bson.M{"corrupt": 1}})
+				if err2 != nil {
+					entry.WithError(err2).Error("add tag for corrupt block")
+				}
 				return
 			}
 		}
