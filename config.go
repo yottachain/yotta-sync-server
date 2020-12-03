@@ -7,6 +7,8 @@ const (
 	ServerMongoDBURLField = "server.mongodb-url"
 	//ServerDBNameField field name of server.db-name
 	ServerDBNameField = "server.db-name"
+	//ServerMinerDBNameField field name of server.miner-db-name
+	ServerMinerDBNameField = "server.miner-db-name"
 	//ServerSNIDField field name of server.sn-id
 	ServerSNIDField = "server.sn-id"
 	//ServerSkipTimeField Field name of server.skip-time
@@ -48,11 +50,12 @@ type Config struct {
 
 //ServerConfig server configuration
 type ServerConfig struct {
-	BindAddr   string `mapstructure:"bind-addr"`
-	MongoDBURL string `mapstructure:"mongodb-url"`
-	DBName     string `mapstructure:"db-name"`
-	SNID       int    `mapstructure:"sn-id"`
-	SkipTime   int    `mapstructure:"skip-time"`
+	BindAddr    string `mapstructure:"bind-addr"`
+	MongoDBURL  string `mapstructure:"mongodb-url"`
+	DBName      string `mapstructure:"db-name"`
+	MinerDBName string `mapstructure:"miner-db-name"`
+	SNID        int    `mapstructure:"sn-id"`
+	SkipTime    int    `mapstructure:"skip-time"`
 }
 
 //ClientConfig client configuration

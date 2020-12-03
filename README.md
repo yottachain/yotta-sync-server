@@ -15,6 +15,8 @@ server:
   mongodb-url: "mongodb://127.0.0.1:27017/?connect=direct"
   #源数据库名
   db-name: "metabase"
+  #矿机数据库名
+  miner-db-name: "yotta"
   #所属SN编号
   sn-id: 0
   #最近几分钟内的数据不进行同步，用于调用GetStoredShards接口时避免一致性问题，单位为秒

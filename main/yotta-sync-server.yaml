@@ -2,6 +2,7 @@ server:
   bind-addr: ":8080"
   mongodb-url: "mongodb://127.0.0.1:27017/?connect=direct"
   db-name: "metabase"
+  miner-db-name: "yotta"
   sn-id: 0
   skip-time: 300
 client:
