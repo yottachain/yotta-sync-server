@@ -146,6 +146,8 @@ var (
 	DefaultServerMongoDBURL string = "mongodb://127.0.0.1:27017/?connect=direct"
 	//DefaultServerDBName default value of ServerDBName
 	DefaultServerDBName string = "metabase"
+	//DefaultServerMinerDBName default value of ServerMinerDBName
+	DefaultServerMinerDBName string = "yotta"
 	//DefaultServerSNID default value of ServerSNID
 	DefaultServerSNID int = 0
 	//DefaultServerSkipTime default value of ServerSkipTime
@@ -186,6 +188,8 @@ func initFlag() {
 	viper.BindPFlag(ytsync.ServerMongoDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ServerMongoDBURLField))
 	rootCmd.PersistentFlags().String(ytsync.ServerDBNameField, DefaultServerDBName, "name of source database")
 	viper.BindPFlag(ytsync.ServerDBNameField, rootCmd.PersistentFlags().Lookup(ytsync.ServerDBNameField))
+	rootCmd.PersistentFlags().String(ytsync.ServerMinerDBNameField, DefaultServerMinerDBName, "name of source miner database")
+	viper.BindPFlag(ytsync.ServerMinerDBNameField, rootCmd.PersistentFlags().Lookup(ytsync.ServerMinerDBNameField))
 	rootCmd.PersistentFlags().Int(ytsync.ServerSNIDField, DefaultServerSNID, "SN index")
 	viper.BindPFlag(ytsync.ServerSNIDField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSNIDField))
 	rootCmd.PersistentFlags().Int(ytsync.ServerSkipTimeField, DefaultServerSkipTime, "ensure not to fetching stored shards till the end")

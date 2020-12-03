@@ -26,14 +26,15 @@ type Server struct {
 
 //ServerDao data access object of server
 type ServerDao struct {
-	dbCli    *mongo.Client
-	dbName   string
-	SNID     int
-	SkipTime int
+	dbCli       *mongo.Client
+	dbName      string
+	minerDBName string
+	SNID        int
+	SkipTime    int
 }
 
 //NewServer create new server instance
-func NewServer(ctx context.Context, mongoDBURL, dbName string, snID, skipTime int) (*Server, error) {
+func NewServer(ctx context.Context, mongoDBURL, dbName, minerdbname string, snID, skipTime int) (*Server, error) {
 	entry := log.WithFields(log.Fields{Function: "NewServer"})
 	dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoDBURL))
 	if err != nil {
@@ -42,7 +43,7 @@ func NewServer(ctx context.Context, mongoDBURL, dbName string, snID, skipTime in
 	}
 	entry.Infof("mongoDB connected: %s", mongoDBURL)
 	server := echo.New()
-	return &Server{server: server, dao: &ServerDao{dbCli: dbClient, dbName: dbName, SNID: snID, SkipTime: skipTime}}, nil
+	return &Server{server: server, dao: &ServerDao{dbCli: dbClient, dbName: dbName, minerDBName: minerdbname, SNID: snID, SkipTime: skipTime}}, nil
 }
 
 //StartServer HTTP server
@@ -56,6 +57,7 @@ func (server *Server) StartServer(bindAddr string) error {
 	server.server.GET("sync/getSyncData", server.GetSyncData)
 	server.server.GET("sync/getShardRebuildMetas", server.GetRebuildData)
 	server.server.GET("sync/GetStoredShards", server.GetStoredShards)
+	server.server.GET("sync/getMinerLogs", server.GetMinerLogs)
 	server.server.Server.Addr = bindAddr
 	err := graceful.ListenAndServe(server.server.Server, 5*time.Second)
 	if err != nil {
@@ -145,6 +147,28 @@ func (server *Server) GetStoredShards(c echo.Context) error {
 	}
 	if resp == nil {
 		resp = make([]*Shard, 0)
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
+}
+
+//GetMinerLogs fetch miner logs
+func (server *Server) GetMinerLogs(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetMinerLogs"})
+	q := new(RebuildQuery)
+	if err := c.Bind(q); err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	resp, err := server.dao.GetMinerLogs(context.Background(), q.Start, q.Count)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if resp == nil {
+		resp = make([]*NodeLog, 0)
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -416,4 +440,35 @@ func (dao *ServerDao) GetStoredShards(ctx context.Context, from, to int64) ([]*S
 		return nil, *innerErr
 	}
 	return append(shards1, shards2...), nil
+}
+
+//GetMinerLogs get miner logs in period
+func (dao *ServerDao) GetMinerLogs(ctx context.Context, start, count int64) ([]*NodeLog, error) {
+	entry := log.WithFields(log.Fields{Function: "GetMinerLogs"})
+	if count == 0 {
+		err := fmt.Errorf("invalid parameters: start -> %d, count -> %d", start, count)
+		entry.WithError(err).Error("invalid parameters")
+		return nil, err
+	}
+	minerLogTab := dao.dbCli.Database(dao.minerDBName).Collection(NodeLogTab)
+	minerLogs := make([]*NodeLog, 0)
+	opts := new(options.FindOptions)
+	opts.Sort = bson.M{"_id": 1}
+	opts.Limit = &count
+	cur, err := minerLogTab.Find(ctx, bson.M{"_id": bson.M{"$gte": start}}, opts)
+	if err != nil {
+		entry.WithError(err).Errorf("traversal miner logs: start -> %d, count -> %d", start, count)
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		minerLog := new(NodeLog)
+		err := cur.Decode(minerLog)
+		if err != nil {
+			entry.WithError(err).Errorf("decoding miner log failed: start -> %d, count -> %d", start, count)
+			return nil, err
+		}
+		minerLogs = append(minerLogs, minerLog)
+	}
+	return minerLogs, nil
 }

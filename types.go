@@ -26,6 +26,8 @@ const (
 	RecordTab = "record"
 	//CorruptBlockTab block_corrupt table
 	CorruptBlockTab = "block_corrupt"
+	//NodeLogTab NodeLog table
+	NodeLogTab = "NodeLog"
 )
 
 //Block struct
@@ -76,4 +78,14 @@ type Record struct {
 	StartTime int32 `bson:"start"`
 	EndTime   int32 `bson:"end"`
 	Sn        int32 `bson:"sn"`
+}
+
+//NodeLog log of node operation
+type NodeLog struct {
+	ID         int64  `bson:"_id" json:"_id"`
+	MinerID    int32  `bson:"minerID" json:"minerID"`
+	FromStatus int32  `bson:"fromStatus" json:"fromStatus"`
+	ToStatus   int32  `bson:"toStatus" json:"toStatus"`
+	Type       string `bson:"type" json:"type"`
+	Timestamp  int64  `bson:"timestamp" json:"timestamp"`
 }

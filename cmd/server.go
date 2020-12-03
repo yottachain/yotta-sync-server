@@ -20,7 +20,7 @@ var serverCmd = &cobra.Command{
 			panic(fmt.Sprintf("unable to decode into config struct, %v\n", err))
 		}
 		initLog(config)
-		svr, err := ytsync.NewServer(context.Background(), config.Server.MongoDBURL, config.Server.DBName, config.Server.SNID, config.Server.SkipTime)
+		svr, err := ytsync.NewServer(context.Background(), config.Server.MongoDBURL, config.Server.DBName, config.Server.MinerDBName, config.Server.SNID, config.Server.SkipTime)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when creating synchronization service: %s\n", err))
 		}
