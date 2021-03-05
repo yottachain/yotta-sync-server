@@ -6,8 +6,9 @@ server:
   sn-id: 0
   skip-time: 300
 client:
-  mongodb-url: "mongodb://127.0.0.1:27017/?retryWrites=true"
-  db-name: "metabase"
+  tidb-url: "root:root@tcp(127.0.0.1:3306)/metabase"
+  max-open-conns: 100
+  max-idle-conns: 200
   all-sync-urls:
   - "http://192.168.36.132:8051"
   - "http://192.168.36.132:8052"

@@ -3,6 +3,7 @@ package ytsync
 import (
 	"compress/gzip"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,16 +14,12 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 //Client client struct
 type Client struct {
 	httpCli   *http.Client
-	dbCli     *mongo.Client
-	dbName    string
+	dbCli     *SQLDao
 	SyncURLs  []string
 	StartTime int32
 	BatchSize int
@@ -31,71 +28,77 @@ type Client struct {
 }
 
 //NewClient create a new client instance
-func NewClient(ctx context.Context, mongoDBURL, dbName string, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
+func NewClient(ctx context.Context, tiDBURL string, maxOpenConns, maxIdelConns int, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
 	entry := log.WithFields(log.Fields{Function: "NewClient"})
-	dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoDBURL))
+	//dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoDBURL))
+	dbClient, err := NewDao(tiDBURL)
 	if err != nil {
-		entry.WithError(err).Errorf("creating mongo DB client failed: %s", mongoDBURL)
+		entry.WithError(err).Errorf("creating TiDB client failed: %s", tiDBURL)
 		return nil, err
 	}
-	entry.Infof("mongoDB connected: %s", mongoDBURL)
-	return &Client{httpCli: &http.Client{}, dbCli: dbClient, dbName: dbName, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
+	dbClient.db.SetMaxOpenConns(maxOpenConns)
+	dbClient.db.SetMaxIdleConns(maxIdelConns)
+	entry.Infof("TiDB connected: %s", tiDBURL)
+	return &Client{httpCli: &http.Client{}, dbCli: dbClient, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
 }
 
 //StartClient start client service
 func (cli *Client) StartClient(ctx context.Context) error {
 	urls := cli.SyncURLs
 	snCount := len(urls)
-	blocksTab := cli.dbCli.Database(cli.dbName).Collection(BlocksTab)
-	shardsTab := cli.dbCli.Database(cli.dbName).Collection(ShardsTab)
-	checkPointTab := cli.dbCli.Database(cli.dbName).Collection(CheckPointTab)
-	recordTab := cli.dbCli.Database(cli.dbName).Collection(RecordTab)
+	// blocksTab := cli.dbCli.Database(cli.dbName).Collection(BlocksTab)
+	// shardsTab := cli.dbCli.Database(cli.dbName).Collection(ShardsTab)
+	// checkPointTab := cli.dbCli.Database(cli.dbName).Collection(CheckPointTab)
+	// recordTab := cli.dbCli.Database(cli.dbName).Collection(RecordTab)
 	for i := 0; i < snCount; i++ {
 		snID := int32(i)
 		go func() {
 			entry := log.WithFields(log.Fields{Function: "StartClient", SNID: snID})
 			entry.Info("starting synchronization process")
 			for {
-				checkPoint := new(CheckPoint)
-				err := checkPointTab.FindOne(ctx, bson.M{"_id": snID}).Decode(checkPoint)
+				// checkPoint := new(CheckPoint)
+				// err := checkPointTab.FindOne(ctx, bson.M{"_id": snID}).Decode(checkPoint)
+				checkPoint, err := cli.dbCli.FindCheckPoint(snID)
 				if err != nil {
-					if err == mongo.ErrNoDocuments {
-						entry.Infof("cannot find checkpoint of SN%d, read record info...", snID)
-						record := new(Record)
-						err := recordTab.FindOne(ctx, bson.M{"sn": snID}).Decode(record)
+					//if err == mongo.ErrNoDocuments {
+					if err == sql.ErrNoRows {
+						// entry.Infof("cannot find checkpoint of SN%d", snID)
+						// record := new(Record)
+						// err := recordTab.FindOne(ctx, bson.M{"sn": snID}).Decode(record)
+						// if err != nil {
+						// 	if err == mongo.ErrNoDocuments {
+						entry.Infof("cannot find checkpoint of SN%d, read start time from config file...", snID)
+						startBytes32 := Int32ToBytes(cli.StartTime)
+						padding := []byte{0x00, 0x00, 0x00, 0x00}
+						startTime64 := BytesToInt64(append(startBytes32, padding...))
+						checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
+						// _, err = checkPointTab.InsertOne(context.Background(), checkPoint)
+						_, err := cli.dbCli.InsertCheckPoint(checkPoint)
 						if err != nil {
-							if err == mongo.ErrNoDocuments {
-								entry.Infof("cannot find record of SN%d, read start time from config file...", snID)
-								startBytes32 := Int32ToBytes(cli.StartTime)
-								padding := []byte{0x00, 0x00, 0x00, 0x00}
-								startTime64 := BytesToInt64(append(startBytes32, padding...))
-								checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
-								_, err = checkPointTab.InsertOne(context.Background(), checkPoint)
-								if err != nil {
-									entry.WithError(err).Errorf("insert checkpoint: %d", snID)
-									time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-									continue
-								}
-								entry.Infof("insert checkpoint of SN%d: %d", snID, checkPoint.Start)
-							} else {
-								entry.WithError(err).Errorf("find record of SN%d", snID)
-								time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-								continue
-							}
-						} else {
-							entry.Infof("find record of SN%d, migrante to checkpoint table...", snID)
-							startBytes32 := Int32ToBytes(record.StartTime)
-							padding := []byte{0x00, 0x00, 0x00, 0x00}
-							startTime64 := BytesToInt64(append(startBytes32, padding...))
-							checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
-							_, err = checkPointTab.InsertOne(context.Background(), checkPoint)
-							if err != nil {
-								entry.WithError(err).Errorf("insert checkpoint: %d", snID)
-								time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-								continue
-							}
-							entry.Infof("migrante to checkpoint table of SN%d: %d", snID, checkPoint.Start)
+							entry.WithError(err).Errorf("insert checkpoint: %d", snID)
+							time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+							continue
 						}
+						entry.Infof("insert checkpoint of SN%d: %d", snID, checkPoint.Start)
+						// 	} else {
+						// 		entry.WithError(err).Errorf("find record of SN%d", snID)
+						// 		time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+						// 		continue
+						// 	}
+						// } else {
+						// 	entry.Infof("find record of SN%d, migrante to checkpoint table...", snID)
+						// 	startBytes32 := Int32ToBytes(record.StartTime)
+						// 	padding := []byte{0x00, 0x00, 0x00, 0x00}
+						// 	startTime64 := BytesToInt64(append(startBytes32, padding...))
+						// 	checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
+						// 	_, err = checkPointTab.InsertOne(context.Background(), checkPoint)
+						// 	if err != nil {
+						// 		entry.WithError(err).Errorf("insert checkpoint: %d", snID)
+						// 		time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+						// 		continue
+						// 	}
+						// 	entry.Infof("migrante to checkpoint table of SN%d: %d", snID, checkPoint.Start)
+						// }
 					} else {
 						entry.WithError(err).Errorf("find checkpoint of SN%d", snID)
 						time.Sleep(time.Duration(cli.WaitTime) * time.Second)
@@ -118,9 +121,9 @@ func (cli *Client) StartClient(ctx context.Context) error {
 					}
 					return "no more data"
 				}())
-				opt := new(options.InsertManyOptions)
-				ordered := false
-				opt.Ordered = &ordered
+				// opt := new(options.InsertManyOptions)
+				// ordered := false
+				// opt.Ordered = &ordered
 				var innerErr *error
 				var wg sync.WaitGroup
 				wg.Add(3)
@@ -128,96 +131,118 @@ func (cli *Client) StartClient(ctx context.Context) error {
 					//insert blocks
 					defer wg.Done()
 					if len(resp.Blocks) > 0 {
-						var ifBlocks []interface{}
+						//var ifBlocks []interface{}
 						for _, b := range resp.Blocks {
 							b.SnID = resp.SNID
-							ifBlocks = append(ifBlocks, b)
+							//ifBlocks = append(ifBlocks, b)
 						}
-						result, err := blocksTab.InsertMany(ctx, ifBlocks, opt)
-						if result != nil {
-							entry.Infof("%d blocks inserted", len(result.InsertedIDs))
-							if err != nil {
-								//entry.WithError(err).Tracef("inserting blocks")
-								bulkException, ok := err.(mongo.BulkWriteException)
-								if ok {
-									if bulkException.WriteConcernError != nil {
-										entry.WithError(bulkException.WriteConcernError).Errorf("insert blocks of SN%d", snID)
-										innerErr = &err
-									} else {
-										for _, e := range bulkException.WriteErrors {
-											if e.Code != 11000 {
-												entry.WithError(e).Errorf("insert blocks of SN%d", snID)
-												innerErr = &err
-												break
-											}
-										}
-									}
-								} else {
-									entry.WithError(err).Errorf("insert blocks of SN%d", snID)
-									innerErr = &err
-								}
-							}
-						} else if err != nil {
+						n, err := cli.dbCli.InsertBlocks(resp.Blocks)
+						if err != nil {
 							entry.WithError(err).Errorf("insert blocks of SN%d", snID)
 							innerErr = &err
+						} else {
+							entry.Infof("%d blocks inserted", n)
 						}
+						//result, err := blocksTab.InsertMany(ctx, ifBlocks, opt)
+						// if result != nil {
+						// 	entry.Infof("%d blocks inserted", len(result.InsertedIDs))
+						// 	if err != nil {
+						// 		//entry.WithError(err).Tracef("inserting blocks")
+						// 		bulkException, ok := err.(mongo.BulkWriteException)
+						// 		if ok {
+						// 			if bulkException.WriteConcernError != nil {
+						// 				entry.WithError(bulkException.WriteConcernError).Errorf("insert blocks of SN%d", snID)
+						// 				innerErr = &err
+						// 			} else {
+						// 				for _, e := range bulkException.WriteErrors {
+						// 					if e.Code != 11000 {
+						// 						entry.WithError(e).Errorf("insert blocks of SN%d", snID)
+						// 						innerErr = &err
+						// 						break
+						// 					}
+						// 				}
+						// 			}
+						// 		} else {
+						// 			entry.WithError(err).Errorf("insert blocks of SN%d", snID)
+						// 			innerErr = &err
+						// 		}
+						// 	}
+						// } else if err != nil {
+						// 	entry.WithError(err).Errorf("insert blocks of SN%d", snID)
+						// 	innerErr = &err
+						// }
 					}
 				}()
 				go func() {
 					//insert shards
 					defer wg.Done()
 					if len(resp.Shards) > 0 {
-						var ifShards []interface{}
-						for _, s := range resp.Shards {
-							ifShards = append(ifShards, s)
-						}
-						result, err := shardsTab.InsertMany(ctx, ifShards, opt)
-						if result != nil {
-							entry.Infof("%d shards inserted", len(result.InsertedIDs))
-							if err != nil {
-								//entry.WithError(err).Tracef("inserting shards")
-								bulkException, ok := err.(mongo.BulkWriteException)
-								if ok {
-									if bulkException.WriteConcernError != nil {
-										entry.WithError(bulkException.WriteConcernError).Errorf("insert shards of SN%d", snID)
-										innerErr = &err
-									} else {
-										for _, e := range bulkException.WriteErrors {
-											if e.Code != 11000 {
-												entry.WithError(e).Errorf("insert shards of SN%d", snID)
-												innerErr = &err
-												break
-											}
-										}
-									}
-								} else {
-									entry.WithError(err).Errorf("insert shards of SN%d", snID)
-									innerErr = &err
-								}
-							}
-						} else if err != nil {
+						// var ifShards []interface{}
+						// for _, s := range resp.Shards {
+						// 	ifShards = append(ifShards, s)
+						// }
+						n, err := cli.dbCli.InsertShards(resp.Shards)
+						if err != nil {
 							entry.WithError(err).Errorf("insert shards of SN%d", snID)
 							innerErr = &err
+						} else {
+							entry.Infof("%d shards inserted", n)
 						}
+						// result, err := shardsTab.InsertMany(ctx, ifShards, opt)
+						// if result != nil {
+						// 	entry.Infof("%d shards inserted", len(result.InsertedIDs))
+						// 	if err != nil {
+						// 		//entry.WithError(err).Tracef("inserting shards")
+						// 		bulkException, ok := err.(mongo.BulkWriteException)
+						// 		if ok {
+						// 			if bulkException.WriteConcernError != nil {
+						// 				entry.WithError(bulkException.WriteConcernError).Errorf("insert shards of SN%d", snID)
+						// 				innerErr = &err
+						// 			} else {
+						// 				for _, e := range bulkException.WriteErrors {
+						// 					if e.Code != 11000 {
+						// 						entry.WithError(e).Errorf("insert shards of SN%d", snID)
+						// 						innerErr = &err
+						// 						break
+						// 					}
+						// 				}
+						// 			}
+						// 		} else {
+						// 			entry.WithError(err).Errorf("insert shards of SN%d", snID)
+						// 			innerErr = &err
+						// 		}
+						// 	}
+						// } else if err != nil {
+						// 	entry.WithError(err).Errorf("insert shards of SN%d", snID)
+						// 	innerErr = &err
+						// }
 					}
 				}()
 				go func() {
 					//update rebuilt shards
 					defer wg.Done()
 					if len(resp.Rebuilds) > 0 {
-						var i int64 = 0
-						for _, r := range resp.Rebuilds {
-							result, err := shardsTab.UpdateOne(ctx, bson.M{"_id": r.VFI, "nodeId": r.SID}, bson.M{"$set": bson.M{"nodeId": r.NID}})
-							if result != nil {
-								entry.Tracef("%d shards updated: %d", result.ModifiedCount, r.VFI)
-								i += result.ModifiedCount
-							} else if err != nil {
-								entry.WithError(err).Errorf("update shards of SN%d: %d", snID, r.VFI)
-								innerErr = &err
-								return
-							}
+						n, err := cli.dbCli.UpdateShards(resp.Rebuilds)
+						if err != nil {
+							entry.WithError(err).Errorf("update shards of SN%d", snID)
+							innerErr = &err
+						} else {
+							entry.Infof("%d shards rebuilt", n)
 						}
-						entry.Infof("%d shards rebuilt", i)
+						// var i int64 = 0
+						// for _, r := range resp.Rebuilds {
+						// 	n, err := cli.dbCli.UpdateShards(resp.Rebuilds)
+						// 	result, err := shardsTab.UpdateOne(ctx, bson.M{"_id": r.VFI, "nodeId": r.SID}, bson.M{"$set": bson.M{"nodeId": r.NID}})
+						// 	if result != nil {
+						// 		entry.Tracef("%d shards updated: %d", result.ModifiedCount, r.VFI)
+						// 		i += result.ModifiedCount
+						// 	} else if err != nil {
+						// 		entry.WithError(err).Errorf("update shards of SN%d: %d", snID, r.VFI)
+						// 		innerErr = &err
+						// 		return
+						// 	}
+						// }
+						// entry.Infof("%d shards rebuilt", i)
 					}
 				}()
 				wg.Wait()
@@ -225,7 +250,8 @@ func (cli *Client) StartClient(ctx context.Context) error {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
-				_, err = checkPointTab.UpdateOne(ctx, bson.M{"_id": snID}, bson.M{"$set": bson.M{"start": resp.Next, "timestamp": time.Now().Unix()}})
+				_, err = cli.dbCli.UpdateCheckPoint(&CheckPoint{ID: snID, Start: resp.Next, Timestamp: time.Now().Unix()})
+				// _, err = checkPointTab.UpdateOne(ctx, bson.M{"_id": snID}, bson.M{"$set": bson.M{"start": resp.Next, "timestamp": time.Now().Unix()}})
 				if err != nil {
 					entry.WithError(err).Errorf("update checkpoint of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)

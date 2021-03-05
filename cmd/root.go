@@ -153,10 +153,12 @@ var (
 	//DefaultServerSkipTime default value of ServerSkipTime
 	DefaultServerSkipTime int = 180
 
-	//DefaultClientMongoDBURL default value of ClientMongoDBURL
-	DefaultClientMongoDBURL string = "mongodb://127.0.0.1:27017/?connect=direct"
-	//DefaultClientDBName default value of ClientDBName
-	DefaultClientDBName string = "metabase"
+	//DefaultClientTiDBURL default value of ClientTiDBURL
+	DefaultClientTiDBURL string = "root:root@tcp(127.0.0.1:3306)/metabase"
+	//DefaultClientMaxOpenConns default value of ClientMaxOpenConns
+	DefaultClientMaxOpenConns int = 100
+	//DefaultClientMaxIdleConns default value of ClientMaxIdleConns
+	DefaultClientMaxIdleConns int = 200
 	//DefaultClientAllSyncURLs default value of ClientAllSyncURLs
 	DefaultClientAllSyncURLs []string = []string{}
 	//DefaultClientStartTime default value of ClientStartTime
@@ -195,10 +197,12 @@ func initFlag() {
 	rootCmd.PersistentFlags().Int(ytsync.ServerSkipTimeField, DefaultServerSkipTime, "ensure not to fetching stored shards till the end")
 	viper.BindPFlag(ytsync.ServerSkipTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSkipTimeField))
 	//client config
-	rootCmd.PersistentFlags().String(ytsync.ClientMongoDBURLField, DefaultClientMongoDBURL, "URL of destination mongoDB")
-	viper.BindPFlag(ytsync.ClientMongoDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMongoDBURLField))
-	rootCmd.PersistentFlags().String(ytsync.ClientDBNameField, DefaultClientDBName, "name of destination database")
-	viper.BindPFlag(ytsync.ClientDBNameField, rootCmd.PersistentFlags().Lookup(ytsync.ClientDBNameField))
+	rootCmd.PersistentFlags().String(ytsync.ClientTiDBURLField, DefaultClientTiDBURL, "URL of destination TiDB")
+	viper.BindPFlag(ytsync.ClientTiDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ClientTiDBURLField))
+	rootCmd.PersistentFlags().Int(ytsync.ClientMaxOpenConnsField, DefaultClientMaxOpenConns, "max open connections of TiDB")
+	viper.BindPFlag(ytsync.ClientMaxOpenConnsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMaxOpenConnsField))
+	rootCmd.PersistentFlags().Int(ytsync.ClientMaxIdleConnsField, DefaultClientMaxIdleConns, "max idle connections of TiDB")
+	viper.BindPFlag(ytsync.ClientMaxIdleConnsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMaxIdleConnsField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientAllSyncURLsField, DefaultClientAllSyncURLs, "all URLs of sync services, in the form of --client.all-sync-urls \"URL1,URL2,URL3\"")
 	viper.BindPFlag(ytsync.ClientAllSyncURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientAllSyncURLsField))
 	rootCmd.PersistentFlags().Int32(ytsync.ClientStartTimeField, DefaultClientStartTime, "synchronizing from this timestamp")
