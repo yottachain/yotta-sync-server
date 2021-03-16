@@ -85,9 +85,11 @@ CREATE TABLE `shards` (
   `nid` int(11) NOT NULL,
   `vhf` binary(16) NOT NULL,
   `bid` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`),
+  PRIMARY KEY (`id`,`nid`),
   KEY `nid_id` (`nid`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+PARTITION BY HASH(nid)
+PARTITIONS 50;
 
 CREATE TABLE `checkpoint` (
   `id` int(11) NOT NULL,
