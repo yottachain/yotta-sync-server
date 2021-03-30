@@ -15,7 +15,7 @@ type SQLDao struct {
 }
 
 //NewDao create a new mysql DAO
-func NewDao(url string) (*SQLDao, error) {
+func NewSQLDao(url string) (*SQLDao, error) {
 	entry := log.WithFields(log.Fields{Function: "NewDao"})
 	//url := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, ip, port, dbname)
 	db, err := sqlx.Connect("mysql", url)
@@ -27,7 +27,7 @@ func NewDao(url string) (*SQLDao, error) {
 }
 
 //FindCheckPoint find checkpoint record by SN ID
-func (sqlDao *SQLDao) FindCheckPoint(id int32) (*CheckPoint, error) {
+func (sqlDao *SQLDao) FindCheckPointSQL(id int32) (*CheckPoint, error) {
 	entry := log.WithFields(log.Fields{Function: "FindCheckPoint", SNID: id})
 	var checkPoint CheckPoint
 	err := sqlDao.db.Get(&checkPoint, fmt.Sprintf("SELECT `id`, `start`, `timestamp` FROM checkpoint where id=%d", id))
@@ -43,7 +43,7 @@ func (sqlDao *SQLDao) FindCheckPoint(id int32) (*CheckPoint, error) {
 }
 
 //InsertCheckPoint insert check point record
-func (sqlDao *SQLDao) InsertCheckPoint(checkPoint *CheckPoint) (int64, error) {
+func (sqlDao *SQLDao) InsertCheckPointSQL(checkPoint *CheckPoint) (int64, error) {
 	entry := log.WithFields(log.Fields{Function: "InsertCheckPoint", SNID: checkPoint.ID})
 	res, err := sqlDao.db.NamedExec("INSERT INTO checkpoint (`id`, `start`, `timestamp`) VALUES (:id, :start, :timestamp)", checkPoint)
 	if err != nil {
@@ -55,7 +55,7 @@ func (sqlDao *SQLDao) InsertCheckPoint(checkPoint *CheckPoint) (int64, error) {
 }
 
 //UpdateCheckPoint update check point record
-func (sqlDao *SQLDao) UpdateCheckPoint(checkPoint *CheckPoint) (int64, error) {
+func (sqlDao *SQLDao) UpdateCheckPointSQL(checkPoint *CheckPoint) (int64, error) {
 	entry := log.WithFields(log.Fields{Function: "UpdateCheckPoint", SNID: checkPoint.ID})
 	res, err := sqlDao.db.NamedExec("UPDATE checkpoint set `start`=:start, `timestamp`=:timestamp where `id`=:id", checkPoint)
 	if err != nil {
@@ -67,7 +67,7 @@ func (sqlDao *SQLDao) UpdateCheckPoint(checkPoint *CheckPoint) (int64, error) {
 }
 
 //InsertBlocks insert blocks into db
-func (sqlDao *SQLDao) InsertBlocks(blocks []*Block) (int64, error) {
+func (sqlDao *SQLDao) InsertBlocksSQL(blocks []*Block) (int64, error) {
 	entry := log.WithFields(log.Fields{Function: "InsertBlocks"})
 	blocksArr := make([][]*Block, 0)
 	size := 16000
@@ -107,7 +107,7 @@ func (sqlDao *SQLDao) InsertBlocks(blocks []*Block) (int64, error) {
 }
 
 //InsertShards insert shards into db
-func (sqlDao *SQLDao) InsertShards(shards []*Shard) (int64, error) {
+func (sqlDao *SQLDao) InsertShardsSQL(shards []*Shard) (int64, error) {
 	entry := log.WithFields(log.Fields{Function: "InsertShards"})
 	shardsArr := make([][]*Shard, 0)
 	size := 16000
@@ -147,7 +147,7 @@ func (sqlDao *SQLDao) InsertShards(shards []*Shard) (int64, error) {
 }
 
 //UpdateShards insert shards into db
-func (sqlDao *SQLDao) UpdateShards(metas []*ShardRebuildMeta) (int64, error) {
+func (sqlDao *SQLDao) UpdateShardsSQL(metas []*ShardRebuildMeta) (int64, error) {
 	entry := log.WithFields(log.Fields{Function: "UpdateShards"})
 	metasArr := make([][]*ShardRebuildMeta, 0)
 	size := 20000

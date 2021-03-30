@@ -153,12 +153,8 @@ var (
 	//DefaultServerSkipTime default value of ServerSkipTime
 	DefaultServerSkipTime int = 180
 
-	//DefaultClientTiDBURL default value of ClientTiDBURL
-	DefaultClientTiDBURL string = "root:root@tcp(127.0.0.1:3306)/metabase"
-	//DefaultClientMaxOpenConns default value of ClientMaxOpenConns
-	DefaultClientMaxOpenConns int = 100
-	//DefaultClientMaxIdleConns default value of ClientMaxIdleConns
-	DefaultClientMaxIdleConns int = 200
+	//DefaultClientPDURLs default value of ClientPDURLs
+	DefaultClientPDURLs []string = []string{}
 	//DefaultClientAllSyncURLs default value of ClientAllSyncURLs
 	DefaultClientAllSyncURLs []string = []string{}
 	//DefaultClientStartTime default value of ClientStartTime
@@ -197,12 +193,8 @@ func initFlag() {
 	rootCmd.PersistentFlags().Int(ytsync.ServerSkipTimeField, DefaultServerSkipTime, "ensure not to fetching stored shards till the end")
 	viper.BindPFlag(ytsync.ServerSkipTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSkipTimeField))
 	//client config
-	rootCmd.PersistentFlags().String(ytsync.ClientTiDBURLField, DefaultClientTiDBURL, "URL of destination TiDB")
-	viper.BindPFlag(ytsync.ClientTiDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ClientTiDBURLField))
-	rootCmd.PersistentFlags().Int(ytsync.ClientMaxOpenConnsField, DefaultClientMaxOpenConns, "max open connections of TiDB")
-	viper.BindPFlag(ytsync.ClientMaxOpenConnsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMaxOpenConnsField))
-	rootCmd.PersistentFlags().Int(ytsync.ClientMaxIdleConnsField, DefaultClientMaxIdleConns, "max idle connections of TiDB")
-	viper.BindPFlag(ytsync.ClientMaxIdleConnsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientMaxIdleConnsField))
+	rootCmd.PersistentFlags().StringSlice(ytsync.ClientPDURLsField, DefaultClientPDURLs, "URLs of PD")
+	viper.BindPFlag(ytsync.ClientPDURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientPDURLsField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientAllSyncURLsField, DefaultClientAllSyncURLs, "all URLs of sync services, in the form of --client.all-sync-urls \"URL1,URL2,URL3\"")
 	viper.BindPFlag(ytsync.ClientAllSyncURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientAllSyncURLsField))
 	rootCmd.PersistentFlags().Int32(ytsync.ClientStartTimeField, DefaultClientStartTime, "synchronizing from this timestamp")

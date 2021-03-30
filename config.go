@@ -14,12 +14,8 @@ const (
 	//ServerSkipTimeField Field name of server.skip-time
 	ServerSkipTimeField = "server.skip-time"
 
-	//ClientTiDBURLField field name of client.tidb-url
-	ClientTiDBURLField = "client.tidb-url"
-	//ClientMaxOpenConnsField field name of client.max-open-conns
-	ClientMaxOpenConnsField = "client.max-open-conns"
-	//ClientMaxIdleConnsField field name of client.max-idle-conns
-	ClientMaxIdleConnsField = "client.max-idle-conns"
+	//ClientPDURLsField field name of client.pd-urls
+	ClientPDURLsField = "client.pd-urls"
 	//ClientAllSyncURLsField Field name of client.all-sync-urls
 	ClientAllSyncURLsField = "client.all-sync-urls"
 	//ClientStartTimeField Field name of client.start-time
@@ -62,14 +58,12 @@ type ServerConfig struct {
 
 //ClientConfig client configuration
 type ClientConfig struct {
-	TiDBURL      string   `mapstructure:"tidb-url"`
-	MaxOpenConns int      `mapstructure:"max-open-conns"`
-	MaxIdleConns int      `mapstructure:"max-idle-conns"`
-	AllSyncURLs  []string `mapstructure:"all-sync-urls"`
-	StartTime    int32    `mapstructure:"start-time"`
-	BatchSize    int      `mapstructure:"batch-size"`
-	WaitTime     int      `mapstructure:"wait-time"`
-	SkipTime     int      `mapstructure:"skip-time"`
+	PDURLs      []string `mapstructure:"pd-urls"`
+	AllSyncURLs []string `mapstructure:"all-sync-urls"`
+	StartTime   int32    `mapstructure:"start-time"`
+	BatchSize   int      `mapstructure:"batch-size"`
+	WaitTime    int      `mapstructure:"wait-time"`
+	SkipTime    int      `mapstructure:"skip-time"`
 }
 
 //LogConfig system log configuration

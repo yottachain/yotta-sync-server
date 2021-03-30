@@ -23,12 +23,9 @@ server:
   skip-time: 300
 #客户端配置
 client:
-  #客户端的同步数据库URL
-  tidb-url: "root:root@tcp(127.0.0.1:3306)/metabase"
-  #客户端最大数据库连接数
-  max-open-conns: 100
-  #客户端最大数据库空闲连接数
-  max-idle-conns: 200
+  #客户端的TIKV集群的PD URLs
+  pd-urls: 
+  - "127.0.0.1:2379"
   #要连接的服务端地址，按SN编号顺序依次配置
   all-sync-urls:
   - "http://127.0.0.1:8051"
