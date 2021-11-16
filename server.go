@@ -186,11 +186,12 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 		entry.WithError(err).Error("invalid parameters")
 		return nil, err
 	}
-	resp := &DataResp{SNID: dao.SNID, From: from, Blocks: make([]*Block, 0), Shards: make([]*Shard, 0), Rebuilds: make([]*ShardRebuildMeta, 0)}
+	resp := &DataResp{SNID: dao.SNID, From: from, Blocks: make([]*Block, 0), Rebuilds: make([]*ShardRebuildMeta, 0)}
 	blockTab := dao.dbCli.Database(dao.dbName).Collection(BlocksTab)
 	corruptBlockTab := dao.dbCli.Database(dao.dbName).Collection(CorruptBlockTab)
 	shardsTab := dao.dbCli.Database(dao.dbName).Collection(ShardsTab)
 	rebuildTab := dao.dbCli.Database(dao.dbName).Collection(ShardsRebuildTab)
+	delTable := dao.dbCli.Database(dao.dbName).Collection(BlockDelTab)
 	//fetch blocks
 	size++
 	opts := new(options.FindOptions)
@@ -233,7 +234,7 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 	resp.Next = resp.Blocks[len(resp.Blocks)-1].ID + int64(resp.Blocks[len(resp.Blocks)-1].VNF)
 	var innerErr *error
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		//fetch shards
 		defer wg.Done()
@@ -257,7 +258,7 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 			}
 			shards = append(shards, shard)
 		}
-		shards2 := make([]*Shard, 0)
+		//shards2 := make([]*Shard, 0)
 		j := 0
 		for _, b := range resp.Blocks {
 			k := 0
@@ -279,7 +280,8 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 				}
 				if i == shards[j].ID {
 					shards[j].BlockID = b.ID
-					shards2 = append(shards2, shards[j])
+					//shards2 = append(shards2, shards[j])
+					b.Shards = append(b.Shards, shards[j])
 					k++
 				} else {
 					i--
@@ -302,7 +304,7 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 				return
 			}
 		}
-		resp.Shards = shards2
+		//resp.Shards = shards2
 	}()
 	go func() {
 		//fetch rebuild meta
@@ -328,6 +330,31 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 			rebuilds = append(rebuilds, rshard)
 		}
 		resp.Rebuilds = rebuilds
+	}()
+	go func() {
+		//fetch delete meta
+		defer wg.Done()
+		opts = new(options.FindOptions)
+		opts.Sort = bson.M{"_id": 1}
+		rCur, err := delTable.Find(ctx, bson.M{"_id": bson.M{"$gte": resp.From, "$lt": resp.Next}}, opts)
+		if err != nil {
+			entry.WithError(err).Errorf("traversal delete blocks: from -> %d, end -> %d", resp.From, resp.Next)
+			innerErr = &err
+			return
+		}
+		defer rCur.Close(ctx)
+		deletes := make([]*BlockDel, 0)
+		for rCur.Next(ctx) {
+			rdelete := new(BlockDel)
+			err := rCur.Decode(rdelete)
+			if err != nil {
+				entry.WithError(err).Errorf("decoding delete block failed: from -> %d, end -> %d", resp.From, resp.Next)
+				innerErr = &err
+				return
+			}
+			deletes = append(deletes, rdelete)
+		}
+		resp.BlockDel = deletes
 	}()
 	wg.Wait()
 	if innerErr != nil {

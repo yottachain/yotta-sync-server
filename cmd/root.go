@@ -153,6 +153,8 @@ var (
 	//DefaultServerSkipTime default value of ServerSkipTime
 	DefaultServerSkipTime int = 180
 
+	//DefaultClientBindAddr default value of ClientBindAddr
+	DefaultClientBindAddr string = ":8087"
 	//DefaultClientPDURLs default value of ClientPDURLs
 	DefaultClientPDURLs []string = []string{}
 	//DefaultClientAllSyncURLs default value of ClientAllSyncURLs
@@ -193,6 +195,8 @@ func initFlag() {
 	rootCmd.PersistentFlags().Int(ytsync.ServerSkipTimeField, DefaultServerSkipTime, "ensure not to fetching stored shards till the end")
 	viper.BindPFlag(ytsync.ServerSkipTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ServerSkipTimeField))
 	//client config
+	rootCmd.PersistentFlags().String(ytsync.ClientBindAddrField, DefaultClientBindAddr, "Binding address of synchronization client http server")
+	viper.BindPFlag(ytsync.ClientBindAddrField, rootCmd.PersistentFlags().Lookup(ytsync.ClientBindAddrField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientPDURLsField, DefaultClientPDURLs, "URLs of PD")
 	viper.BindPFlag(ytsync.ClientPDURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientPDURLsField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientAllSyncURLsField, DefaultClientAllSyncURLs, "all URLs of sync services, in the form of --client.all-sync-urls \"URL1,URL2,URL3\"")

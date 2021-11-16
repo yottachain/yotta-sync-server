@@ -26,7 +26,7 @@ var clientCmd = &cobra.Command{
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when creating synchronization client: %s\n", err))
 		}
-		err = client.StartClient(context.Background())
+		err = client.StartClient(context.Background(), config.Client.BindAddr)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when starting synchronization client: %s\n", err))
 		}

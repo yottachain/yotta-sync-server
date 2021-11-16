@@ -9,6 +9,7 @@ message BlockMsg {
 	int32 vnf = 2;
 	int32 ar = 3;
 	int32 snID = 4;
+	repeated ShardMsg shards = 5;
 }
 
 message ShardMsg {
@@ -16,6 +17,7 @@ message ShardMsg {
 	int32 nodeID = 2;
 	bytes vhf = 3;
 	int64 blockID = 4;
+	int32 nodeID2 = 5;
 }
 
 message CheckPointMsg {

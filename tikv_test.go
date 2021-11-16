@@ -31,25 +31,25 @@ func TestTikv(t *testing.T) {
 	// 	fmt.Printf("found val: %s\n", v)
 	// }
 
-	// for _, v := range []int{2, 1, 4, 3, 6, 5, 8, 7, 9} {
-	// 	key := []byte(fmt.Sprintf("blocks_%d", v))
-	// 	val := []byte(fmt.Sprintf("shards_%d", v))
-	// 	// put key into tikv
-	// 	err = cli.Put(context.TODO(), key, val)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	fmt.Printf("Successfully put %s:%s to tikv\n", key, val)
-	// }
-	// keys, values, err := cli.ReverseScan(context.TODO(), append([]byte("blocks_6"), '\x00'), append([]byte("blocks_0"), '\x00'), 4)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// for i := 0; i < len(keys); i++ {
-	// 	k := keys[i]
-	// 	v := values[i]
-	// 	fmt.Printf("found val: %s for key: %s\n", v, k)
-	// }
+	for _, v := range []int{2, 1, 4, 3, 6, 5, 8, 7, 9} {
+		key := []byte(fmt.Sprintf("blocks_%d", v))
+		val := []byte(fmt.Sprintf("shards_%d", v))
+		// put key into tikv
+		err = cli.Put(context.TODO(), key, val)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Successfully put %s:%s to tikv\n", key, val)
+	}
+	keys, values, err := cli.ReverseScan(context.TODO(), append([]byte("blocks_6"), '\x00'), append([]byte("blocks_0"), '\x00'), 4)
+	if err != nil {
+		panic(err)
+	}
+	for i := 0; i < len(keys); i++ {
+		k := keys[i]
+		v := values[i]
+		fmt.Printf("found val: %s for key: %s\n", v, k)
+	}
 	key := []byte("Company")
 	// val := []byte("PingCAP")
 

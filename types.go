@@ -25,6 +25,8 @@ const (
 	ShardsTab = "shards"
 	//ShardsRebuildTab shards_rebuild table
 	ShardsRebuildTab = "shards_rebuild"
+	//BlockDelTab blocks_tab table
+	BlockDelTab = "blocks_bak"
 	//CheckPointTab CheckPoint table
 	CheckPointTab = "CheckPoint"
 	//RecordTab record table
@@ -37,34 +39,43 @@ const (
 
 //Block struct
 type Block struct {
-	ID   int64 `bson:"_id" json:"_id" db:"id"`
-	VNF  int32 `bson:"VNF" json:"VNF" db:"vnf"`
-	AR   int32 `bson:"AR" json:"AR" db:"ar"`
-	SnID int32 `bson:"snId" json:"-" db:"snid"`
+	ID     int64    `bson:"_id" json:"_id"`
+	VNF    int32    `bson:"VNF" json:"VNF"`
+	AR     int32    `bson:"AR" json:"AR"`
+	SnID   int32    `bson:"snId" json:"-"`
+	Shards []*Shard `bson:"-" json:"shards"`
 }
 
 //Shard struct
 type Shard struct {
-	ID      int64  `bson:"_id" json:"_id" db:"id"`
-	NodeID  int32  `bson:"nodeId" json:"nid" db:"nid"`
-	VHF     []byte `bson:"VHF" json:"VHF" db:"vhf"`
-	BlockID int64  `bson:"blockid" json:"bid" db:"bid"`
+	ID      int64  `bson:"_id" json:"_id"`
+	NodeID  int32  `bson:"nodeId" json:"nid"`
+	VHF     []byte `bson:"VHF" json:"VHF"`
+	BlockID int64  `bson:"blockid" json:"bid"`
+	NodeID2 int32  `bson:"nodeId2" json:"nid2"`
 }
 
 //ShardRebuildMeta struct
 type ShardRebuildMeta struct {
-	ID  int64 `bson:"_id" json:"_id" db:"id"`
-	VFI int64 `bson:"VFI" json:"VFI" db:"vfi"`
-	NID int32 `bson:"nid" json:"nid" db:"nid"`
-	SID int32 `bson:"sid" json:"sid" db:"sid"`
+	ID  int64 `bson:"_id" json:"_id"`
+	VFI int64 `bson:"VFI" json:"VFI"`
+	NID int32 `bson:"nid" json:"nid"`
+	SID int32 `bson:"sid" json:"sid"`
+}
+
+//BlockDel struct
+type BlockDel struct {
+	ID  int64 `bson:"_id" json:"_id"`
+	VBI int64 `bson:"VBI" json:"VBI"`
 }
 
 //DataResp response data of sync server
 type DataResp struct {
-	SNID     int                 `json:"SN"`
-	Blocks   []*Block            `json:"blocks"`
-	Shards   []*Shard            `json:"shards"`
+	SNID   int      `json:"SN"`
+	Blocks []*Block `json:"blocks"`
+	//Shards   []*Shard            `json:"shards"`
 	Rebuilds []*ShardRebuildMeta `json:"rebuilds"`
+	BlockDel []*BlockDel         `json:"deletes"`
 	From     int64               `json:"from"`
 	Next     int64               `json:"next"`
 	Size     int64               `json:"size"`
@@ -97,12 +108,16 @@ type NodeLog struct {
 
 // Convert convert Block strcut to BlockMsg
 func (block *Block) Convert() *pb.BlockMsg {
-	return &pb.BlockMsg{
+	msg := &pb.BlockMsg{
 		Id:   block.ID,
 		Vnf:  block.VNF,
 		Ar:   block.AR,
 		SnID: block.SnID,
 	}
+	for _, s := range block.Shards {
+		msg.Shards = append(msg.Shards, s.Convert())
+	}
+	return msg
 }
 
 // Fillby convert BlockMsg to Block struct
@@ -111,6 +126,11 @@ func (block *Block) Fillby(msg *pb.BlockMsg) {
 	block.VNF = msg.Vnf
 	block.AR = msg.Ar
 	block.SnID = msg.SnID
+	for _, s := range msg.Shards {
+		shard := new(Shard)
+		shard.Fillby(s)
+		block.Shards = append(block.Shards, shard)
+	}
 }
 
 // FillBytes convert bytes to Block strcut
@@ -136,6 +156,7 @@ func (shard *Shard) Convert() *pb.ShardMsg {
 		NodeID:  shard.NodeID,
 		Vhf:     shard.VHF,
 		BlockID: shard.BlockID,
+		NodeID2: shard.NodeID2,
 	}
 }
 
@@ -145,6 +166,7 @@ func (shard *Shard) Fillby(msg *pb.ShardMsg) {
 	shard.NodeID = msg.NodeID
 	shard.VHF = msg.Vhf
 	shard.BlockID = msg.BlockID
+	shard.NodeID2 = msg.NodeID2
 }
 
 // FillBytes convert bytes to Shard strcut

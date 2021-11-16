@@ -6,6 +6,7 @@ server:
   sn-id: 0
   skip-time: 300
 client:
+  bind-addr: ":8080"
   pd-urls: 
   - "127.0.0.1:2379"
   all-sync-urls:

@@ -14,6 +14,8 @@ const (
 	//ServerSkipTimeField Field name of server.skip-time
 	ServerSkipTimeField = "server.skip-time"
 
+	//ClientBindAddrField field name of client.bind-addr
+	ClientBindAddrField = "client.bind-addr"
 	//ClientPDURLsField field name of client.pd-urls
 	ClientPDURLsField = "client.pd-urls"
 	//ClientAllSyncURLsField Field name of client.all-sync-urls
@@ -58,6 +60,7 @@ type ServerConfig struct {
 
 //ClientConfig client configuration
 type ClientConfig struct {
+	BindAddr    string   `mapstructure:"bind-addr"`
 	PDURLs      []string `mapstructure:"pd-urls"`
 	AllSyncURLs []string `mapstructure:"all-sync-urls"`
 	StartTime   int32    `mapstructure:"start-time"`

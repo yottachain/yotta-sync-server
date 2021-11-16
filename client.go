@@ -7,16 +7,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
+	"github.com/tylerb/graceful"
 )
+
+var checkPoints map[int32]int64
 
 //Client client struct
 type Client struct {
+	server    *echo.Echo
 	httpCli   *http.Client
 	tikvCli   *TikvDao
 	SyncURLs  []string
@@ -24,6 +29,7 @@ type Client struct {
 	BatchSize int
 	WaitTime  int
 	SkipTime  int
+	lock      sync.RWMutex
 }
 
 //NewClient create a new client instance
@@ -34,13 +40,33 @@ func NewClient(ctx context.Context, pdURLs []string, syncURLs []string, startTim
 		entry.WithError(err).Errorf("creating tikv client failed: %v", pdURLs)
 		return nil, err
 	}
-	return &Client{httpCli: &http.Client{}, tikvCli: tikvCli, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
+	server := echo.New()
+	return &Client{server: server, httpCli: &http.Client{}, tikvCli: tikvCli, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
 }
 
 //StartClient start client service
-func (cli *Client) StartClient(ctx context.Context) error {
+func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
+	checkPoints = make(map[int32]int64)
 	urls := cli.SyncURLs
 	snCount := len(urls)
+	for i := 0; i < snCount; i++ {
+		snID := int32(i)
+		checkPoints[snID] = 0
+	}
+	cli.server.Use(middleware.Logger())
+	cli.server.Use(middleware.Recover())
+	cli.server.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 5,
+	}))
+	cli.server.GET("getCheckPoints", cli.GetCheckPoints)
+	cli.server.Server.Addr = bindAddr
+	go func() {
+		err := graceful.ListenAndServe(cli.server.Server, 5*time.Second)
+		if err != nil {
+			log.WithError(err).Errorf("start http server failed: %s", bindAddr)
+		}
+	}()
+
 	for i := 0; i < snCount; i++ {
 		snID := int32(i)
 		go func() {
@@ -62,6 +88,9 @@ func (cli *Client) StartClient(ctx context.Context) error {
 							continue
 						}
 						entry.Infof("insert checkpoint of SN%d: %d", snID, checkPoint.Start)
+						cli.lock.Lock()
+						checkPoints[snID] = int64(cli.StartTime) * 1000000000
+						cli.lock.Unlock()
 					} else {
 						entry.WithError(err).Errorf("find checkpoint of SN%d", snID)
 						time.Sleep(time.Duration(cli.WaitTime) * time.Second)
@@ -78,15 +107,15 @@ func (cli *Client) StartClient(ctx context.Context) error {
 				if snID != int32(resp.SNID) {
 					entry.Fatalf("received SN ID not match current process: %d", resp.SNID)
 				}
-				entry.Debugf("received response of SN%d: %d blocks, %d shards, %d rebuilds, %s", resp.SNID, len(resp.Blocks), len(resp.Shards), len(resp.Rebuilds), func() string {
-					if resp.More == true {
+				entry.Debugf("received response of SN%d: %d blocks, %d rebuilds, %s", resp.SNID, len(resp.Blocks), len(resp.Rebuilds), func() string {
+					if resp.More {
 						return "have more data"
 					}
 					return "no more data"
 				}())
 				var innerErr *error
 				var wg sync.WaitGroup
-				wg.Add(3)
+				wg.Add(4)
 				go func() {
 					defer wg.Done()
 					if len(resp.Blocks) > 0 {
@@ -105,13 +134,17 @@ func (cli *Client) StartClient(ctx context.Context) error {
 				go func() {
 					//insert shards
 					defer wg.Done()
-					if len(resp.Shards) > 0 {
-						err := cli.tikvCli.InsertShards(ctx, resp.Shards)
+					if len(resp.Blocks) > 0 {
+						shards := make([]*Shard, 0)
+						for _, b := range resp.Blocks {
+							shards = append(shards, b.Shards...)
+						}
+						err := cli.tikvCli.InsertShards(ctx, shards)
 						if err != nil {
 							entry.WithError(err).Errorf("insert shards of SN%d", snID)
 							innerErr = &err
 						} else {
-							entry.Infof("%d shards inserted", len(resp.Shards))
+							entry.Infof("%d shards inserted", len(shards))
 						}
 					}
 				}()
@@ -128,6 +161,19 @@ func (cli *Client) StartClient(ctx context.Context) error {
 						}
 					}
 				}()
+				go func() {
+					//delete blocks
+					defer wg.Done()
+					if len(resp.BlockDel) > 0 {
+						err := cli.tikvCli.DeletBlocks(ctx, resp.BlockDel)
+						if err != nil {
+							entry.WithError(err).Errorf("update shards of SN%d", snID)
+							innerErr = &err
+						} else {
+							entry.Infof("%d shards delete", len(resp.BlockDel))
+						}
+					}
+				}()
 				wg.Wait()
 				if innerErr != nil {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
@@ -140,7 +186,10 @@ func (cli *Client) StartClient(ctx context.Context) error {
 					continue
 				}
 				entry.Debugf("update checkpoint to %d", resp.Next)
-				if resp.More == false {
+				cli.lock.Lock()
+				checkPoints[snID] = (resp.Next >> 32) * 1000000000
+				cli.lock.Unlock()
+				if !resp.More {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 				}
 			}
@@ -182,8 +231,21 @@ func GetSyncData(httpCli *http.Client, url string, from int64, size int, skip in
 		entry.WithError(err).Errorf("decode sync data failed: %s", fullURL)
 		return nil, err
 	}
-	sort.Slice(response.Shards[:], func(i, j int) bool {
-		return response.Shards[i].NodeID < response.Shards[j].NodeID
-	})
+	// sort.Slice(response.Shards[:], func(i, j int) bool {
+	// 	return response.Shards[i].NodeID < response.Shards[j].NodeID
+	// })
 	return response, nil
+}
+
+//GetCheckPoints fetch checkpoints
+func (cli *Client) GetCheckPoints(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetCheckPoints"})
+	cli.lock.RLock()
+	b, err := json.Marshal(checkPoints)
+	cli.lock.RUnlock()
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
 }
