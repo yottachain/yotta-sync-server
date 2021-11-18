@@ -172,6 +172,9 @@ func (tikvDao *TikvDao) UpdateShards(ctx context.Context, metas []*ShardRebuildM
 			return err
 		}
 
+		if msg.Timestamp > (m.ID>>32)+60 {
+			continue
+		}
 		if m.SID == msg.NodeID && msg.NodeID2 == 0 {
 			nskeys1 = append(nskeys1, []byte(shardsNodeKey(m.VFI, m.NID)))
 			nskeysdel = append(nskeysdel, []byte(shardsNodeKey(m.VFI, m.SID)))

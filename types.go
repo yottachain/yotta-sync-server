@@ -1,6 +1,8 @@
 package ytsync
 
 import (
+	"time"
+
 	proto "github.com/golang/protobuf/proto"
 	pb "github.com/yottachain/yotta-sync-server/pb"
 )
@@ -152,11 +154,12 @@ func (block *Block) ConvertBytes() ([]byte, error) {
 // Convert convert Shard strcut to ShardMsg
 func (shard *Shard) Convert() *pb.ShardMsg {
 	return &pb.ShardMsg{
-		Id:      shard.ID,
-		NodeID:  shard.NodeID,
-		Vhf:     shard.VHF,
-		BlockID: shard.BlockID,
-		NodeID2: shard.NodeID2,
+		Id:        shard.ID,
+		NodeID:    shard.NodeID,
+		Vhf:       shard.VHF,
+		BlockID:   shard.BlockID,
+		NodeID2:   shard.NodeID2,
+		Timestamp: time.Now().Unix(),
 	}
 }
 

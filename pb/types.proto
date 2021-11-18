@@ -18,6 +18,7 @@ message ShardMsg {
 	bytes vhf = 3;
 	int64 blockID = 4;
 	int32 nodeID2 = 5;
+	int64 timestamp = 6;
 }
 
 message CheckPointMsg {
