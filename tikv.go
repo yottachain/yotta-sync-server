@@ -137,6 +137,56 @@ func (tikvDao *TikvDao) InsertShards(ctx context.Context, shards []*Shard) error
 	return nil
 }
 
+func (tikvDao *TikvDao) BatchGet(ctx context.Context, keys [][]byte, count int64) ([][]byte, error) {
+	entry := log.WithFields(log.Fields{Function: "BatchGet"})
+	segments := make([][][]byte, 0)
+	max := int64(len(keys))
+	if max < count {
+		segments = append(segments, keys)
+	} else {
+		var quantity int64
+		if max%count == 0 {
+			quantity = max / count
+		} else {
+			quantity = (max / count) + 1
+		}
+		var start, end, i int64
+		for i = 1; i <= quantity; i++ {
+			end = i * count
+			if i != quantity {
+				segments = append(segments, keys[start:end])
+			} else {
+				segments = append(segments, keys[start:])
+			}
+			start = i * count
+		}
+	}
+	result := make([][]byte, 0)
+	for index, ks := range segments {
+		entry.Debugf("fetch %d batch of keys", index)
+		bufs, err := tikvDao.batchGetRetries(ctx, ks, 10)
+		if err != nil {
+			entry.WithError(err).Error("batch get shards failed")
+			return nil, err
+		}
+		result = append(result, bufs...)
+	}
+	return result, nil
+}
+
+func (tikvDao *TikvDao) batchGetRetries(ctx context.Context, keys [][]byte, retries int) ([][]byte, error) {
+	entry := log.WithFields(log.Fields{Function: "batchGetRetries"})
+	bufs, err := tikvDao.cli.BatchGet(ctx, keys)
+	if err != nil {
+		entry.WithError(err).Debugf("error when batch get, retires countdown %d", retries)
+		if retries == 0 {
+			return nil, err
+		}
+		return tikvDao.batchGetRetries(ctx, keys, retries-1)
+	}
+	return bufs, nil
+}
+
 //UpdateShards update shards meta
 func (tikvDao *TikvDao) UpdateShards(ctx context.Context, metas []*ShardRebuildMeta) error {
 	entry := log.WithFields(log.Fields{Function: "UpdateShards"})
@@ -147,7 +197,7 @@ func (tikvDao *TikvDao) UpdateShards(ctx context.Context, metas []*ShardRebuildM
 	for _, m := range metas {
 		keys1 = append(keys1, []byte(shardsNodeKey(m.VFI, m.SID)))
 	}
-	bufs1, err := tikvDao.cli.BatchGet(ctx, keys1)
+	bufs1, err := tikvDao.BatchGet(ctx, keys1, 10000)
 	if err != nil {
 		entry.WithError(err).Error("batch get node shards failed")
 		return err
@@ -243,42 +293,12 @@ func (tikvDao *TikvDao) UpdateShards(ctx context.Context, metas []*ShardRebuildM
 		} else {
 			continue
 		}
-
-		// if m.SID == msg.NodeID {
-		// 	nskeys1 = append(nskeys1, []byte(shardsNodeKey(m.VFI, m.NID)))
-		// 	nskeysdel = append(nskeysdel, []byte(shardsNodeKey(m.VFI, m.SID)))
-		// 	msg.NodeID = m.NID
-		// 	nsb, err := proto.Marshal(msg)
-		// 	if err != nil {
-		// 		entry.WithError(err).Error("marshal failed")
-		// 		return err
-		// 	}
-		// 	nsbufs1 = append(nsbufs1, nsb)
-		// 	if msg.NodeID2 != 0 {
-		// 		nskeys2 = append(nskeys2, []byte(shardsNodeKey(m.VFI, msg.NodeID2)))
-		// 		nsbufs2 = append(nsbufs1, nsb)
-		// 	}
-		// } else if m.SID == msg.NodeID2 {
-		// 	nskeys1 = append(nskeys1, []byte(shardsNodeKey(m.VFI, m.NID)))
-		// 	nskeysdel = append(nskeysdel, []byte(shardsNodeKey(m.VFI, m.SID)))
-		// 	msg.NodeID2 = m.NID
-		// 	nsb, err := proto.Marshal(msg)
-		// 	if err != nil {
-		// 		entry.WithError(err).Error("marshal failed")
-		// 		return err
-		// 	}
-		// 	nsbufs1 = append(nsbufs1, nsb)
-		// 	if msg.NodeID != 0 {
-		// 		nskeys2 = append(nskeys2, []byte(shardsNodeKey(m.VFI, msg.NodeID)))
-		// 		nsbufs2 = append(nsbufs1, nsb)
-		// 	}
-		// }
 		bkeysb = append(bkeysb, []byte(blocksKey(msg.BlockID)))
 		bshards = append(bshards, msg)
 	}
 	bkeysb2 := make([][]byte, 0)
 	bbufs := make([][]byte, 0)
-	bufs2, err := tikvDao.cli.BatchGet(ctx, bkeysb)
+	bufs2, err := tikvDao.BatchGet(ctx, bkeysb, 1000)
 	if err != nil {
 		entry.WithError(err).Error("batch get failed")
 		return err
@@ -330,95 +350,11 @@ func (tikvDao *TikvDao) UpdateShards(ctx context.Context, metas []*ShardRebuildM
 		return err
 	}
 	return nil
-
-	// keys1 := make([][]byte, 0)
-	// keys1new := make([][]byte, 0)
-	// keys2old := make([][]byte, 0)
-	// keys2new1 := make([][]byte, 0)
-	// keys2new2 := make([][]byte, 0)
-	// vals1 := make([][]byte, 0)
-	// vals2 := make([][]byte, 0)
-	// for _, m := range metas {
-	// 	keys1 = append(keys1, []byte(shardsKey(m.VFI)))
-	// }
-	// bufs, err := tikvDao.cli.BatchGet(ctx, keys1)
-	// if err != nil {
-	// 	entry.WithError(err).Error("batch get failed")
-	// 	return err
-	// }
-	// for i := 0; i < len(bufs); i++ {
-	// 	b := bufs[i]
-	// 	if b == nil {
-	// 		continue
-	// 	}
-	// 	msg := new(pb.ShardMsg)
-	// 	err := proto.Unmarshal(b, msg)
-	// 	if err != nil {
-	// 		entry.WithError(err).Error("unmarshal failed")
-	// 		return err
-	// 	}
-	// 	if msg.NodeID != metas[i].SID && msg.NodeID2 != metas[i].SID {
-	// 		continue
-	// 	}
-
-	// 	if msg.NodeID == metas[i].SID {
-	// 		msg.NodeID = metas[i].NID
-	// 		b, err = proto.Marshal(msg)
-	// 		if err != nil {
-	// 			entry.WithError(err).Error("marshal failed")
-	// 			return err
-	// 		}
-	// 		keys2new1 = append(keys2new1, []byte(shardsNodeKey(metas[i].VFI, msg.NodeID)))
-	// 		vals1 = append(vals1, b)
-	// 		if msg.NodeID2 > 0 {
-	// 			keys2new2 = append(keys2new2, []byte(shardsNodeKey(metas[i].VFI, msg.NodeID2)))
-	// 			vals2 = append(vals2, b)
-	// 		}
-	// 	} else if msg.NodeID2 == metas[i].SID {
-	// 		msg.NodeID2 = metas[i].NID
-	// 		b, err = proto.Marshal(msg)
-	// 		if err != nil {
-	// 			entry.WithError(err).Error("marshal failed")
-	// 			return err
-	// 		}
-	// 		keys2new1 = append(keys2new1, []byte(shardsNodeKey(metas[i].VFI, msg.NodeID2)))
-	// 		vals1 = append(vals1, b)
-	// 		if msg.NodeID > 0 {
-	// 			keys2new2 = append(keys2new2, []byte(shardsNodeKey(metas[i].VFI, msg.NodeID)))
-	// 			vals2 = append(vals2, b)
-	// 		}
-	// 	} else {
-	// 		continue
-	// 	}
-	// 	keys1new = append(keys1new, []byte(shardsKey(metas[i].VFI)))
-	// 	keys2old = append(keys2old, []byte(shardsNodeKey(metas[i].VFI, metas[i].SID)))
-	// }
-	// err = tikvDao.cli.BatchDelete(ctx, keys2old)
-	// if err != nil {
-	// 	entry.WithError(err).Error("batch delete error")
-	// 	return err
-	// }
-	// err = tikvDao.cli.BatchPut(ctx, keys2new1, vals1)
-	// if err != nil {
-	// 	entry.WithError(err).Error("batch put error: 2")
-	// 	return err
-	// }
-	// err = tikvDao.cli.BatchPut(ctx, keys2new2, vals2)
-	// if err != nil {
-	// 	entry.WithError(err).Error("batch put error: 3")
-	// 	return err
-	// }
-	// err = tikvDao.cli.BatchPut(ctx, keys1new, vals1)
-	// if err != nil {
-	// 	entry.WithError(err).Error("batch put error: 1")
-	// 	return err
-	// }
-	// return nil
 }
 
 //DeleteBlocks delete blocks
-func (tikvDao *TikvDao) DeletBlocks(ctx context.Context, blocks []*BlockDel) error {
-	entry := log.WithFields(log.Fields{Function: "DeletBlocks"})
+func (tikvDao *TikvDao) DeleteBlocks(ctx context.Context, blocks []*BlockDel) error {
+	entry := log.WithFields(log.Fields{Function: "DeleteBlocks"})
 	if len(blocks) == 0 {
 		return nil
 	}
@@ -427,7 +363,7 @@ func (tikvDao *TikvDao) DeletBlocks(ctx context.Context, blocks []*BlockDel) err
 	for _, b := range blocks {
 		keys = append(keys, []byte(blocksKey(b.VBI)))
 	}
-	bufs, err := tikvDao.cli.BatchGet(ctx, keys)
+	bufs, err := tikvDao.BatchGet(ctx, keys, 1000)
 	if err != nil {
 		entry.WithError(err).Error("batch get failed")
 		return err

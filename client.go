@@ -152,12 +152,37 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 					//update rebuilt shards
 					defer wg.Done()
 					if len(resp.Rebuilds) > 0 {
-						err := cli.tikvCli.UpdateShards(ctx, resp.Rebuilds)
-						if err != nil {
-							entry.WithError(err).Errorf("update shards of SN%d", snID)
-							innerErr = &err
+						var count int64 = 10000
+						metas := make([][]*ShardRebuildMeta, 0)
+						max := int64(len(resp.Rebuilds))
+						if max < count {
+							metas = append(metas, resp.Rebuilds)
 						} else {
-							entry.Infof("%d shards rebuilt", len(resp.Rebuilds))
+							var quantity int64
+							if max%count == 0 {
+								quantity = max / count
+							} else {
+								quantity = (max / count) + 1
+							}
+							var start, end, i int64
+							for i = 1; i <= quantity; i++ {
+								end = i * count
+								if i != quantity {
+									metas = append(metas, resp.Rebuilds[start:end])
+								} else {
+									metas = append(metas, resp.Rebuilds[start:])
+								}
+								start = i * count
+							}
+						}
+						for index, m := range metas {
+							err := cli.tikvCli.UpdateShards(ctx, m)
+							if err != nil {
+								entry.WithError(err).Errorf("update shards of SN%d: %d", snID, index)
+								innerErr = &err
+							} else {
+								entry.Infof("%d shards rebuilt: %d", len(m), index)
+							}
 						}
 					}
 				}()
@@ -165,7 +190,7 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 					//delete blocks
 					defer wg.Done()
 					if len(resp.BlockDel) > 0 {
-						err := cli.tikvCli.DeletBlocks(ctx, resp.BlockDel)
+						err := cli.tikvCli.DeleteBlocks(ctx, resp.BlockDel)
 						if err != nil {
 							entry.WithError(err).Errorf("update shards of SN%d", snID)
 							innerErr = &err
