@@ -29,6 +29,15 @@ const (
 	//ClientSkipTimeField Field name of client.skip-time
 	ClientSkipTimeField = "client.skip-time"
 
+	//ClientArrayBaseBaseDirField Field name of client.arraybase.base-dir
+	ClientArrayBaseBaseDirField = "client.arraybase.base-dir"
+	//ClientArrayBaseRowsPerFileField Field name of client.arraybase.rows-per-file
+	ClientArrayBaseRowsPerFileField = "client.arraybase.rows-per-file"
+	//ClientArrayBaseReadBufLenField Field name of client.arraybase.read-buf-len
+	ClientArrayBaseReadBufLenField = "client.arraybase.read-buf-len"
+	//ClientArrayBaseWriteBufLenField Field name of client.arraybase.write-buf-len
+	ClientArrayBaseWriteBufLenField = "client.arraybase.write-buf-len"
+
 	//LoggerOutputField Field name of logger.output config
 	LoggerOutputField = "logger.output"
 	//LoggerFilePathField Field name of logger.file-path config
@@ -60,13 +69,22 @@ type ServerConfig struct {
 
 //ClientConfig client configuration
 type ClientConfig struct {
-	BindAddr    string   `mapstructure:"bind-addr"`
-	PDURLs      []string `mapstructure:"pd-urls"`
-	AllSyncURLs []string `mapstructure:"all-sync-urls"`
-	StartTime   int32    `mapstructure:"start-time"`
-	BatchSize   int      `mapstructure:"batch-size"`
-	WaitTime    int      `mapstructure:"wait-time"`
-	SkipTime    int      `mapstructure:"skip-time"`
+	BindAddr    string           `mapstructure:"bind-addr"`
+	PDURLs      []string         `mapstructure:"pd-urls"`
+	AllSyncURLs []string         `mapstructure:"all-sync-urls"`
+	StartTime   int32            `mapstructure:"start-time"`
+	BatchSize   int              `mapstructure:"batch-size"`
+	WaitTime    int              `mapstructure:"wait-time"`
+	SkipTime    int              `mapstructure:"skip-time"`
+	ArrayBase   *ArrayBaseConfig `mapstructure:"arraybase"`
+}
+
+//ArrayBaseConfig arraybase configuration
+type ArrayBaseConfig struct {
+	BaseDir     string `mapstructure:"base-dir"`
+	RowsPerFile uint64 `mapstructure:"rows-per-file"`
+	ReadBufLen  int    `mapstructure:"read-buf-len"`
+	WriteBufLen int    `mapstructure:"write-buf-len"`
 }
 
 //LogConfig system log configuration

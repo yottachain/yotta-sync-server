@@ -1,9 +1,8 @@
 package ytsync
 
 import (
-	"time"
-
 	proto "github.com/golang/protobuf/proto"
+	ytab "github.com/yottachain/yotta-arraybase"
 	pb "github.com/yottachain/yotta-sync-server/pb"
 )
 
@@ -41,10 +40,13 @@ const (
 
 //Block struct
 type Block struct {
-	ID     int64    `bson:"_id" json:"_id"`
-	VNF    int32    `bson:"VNF" json:"VNF"`
-	AR     int32    `bson:"AR" json:"AR"`
-	SnID   int32    `bson:"snId" json:"-"`
+	ID  int64  `bson:"_id" json:"_id"`
+	VHP []byte `bson:"VHP" json:"VHP"`
+	VHB []byte `bson:"VHB" json:"VHB"`
+	KED []byte `bson:"KED" json:"KED"`
+	VNF int32  `bson:"VNF" json:"VNF"`
+	AR  int32  `bson:"AR" json:"AR"`
+	//SnID   int32    `bson:"snId" json:"-"`
 	Shards []*Shard `bson:"-" json:"shards"`
 }
 
@@ -108,13 +110,46 @@ type NodeLog struct {
 	Timestamp  int64  `bson:"timestamp" json:"timestamp"`
 }
 
+func (block *Block) ConvertToAB() *ytab.Block {
+	blockAB := new(ytab.Block)
+	blockAB.ID = uint64(block.ID)
+	if len(block.VHP) == 32 {
+		blockAB.VHP = block.VHP
+	} else {
+		blockAB.VHP = make([]byte, 32)
+	}
+	if len(block.VHB) == 16 {
+		blockAB.VHB = block.VHB
+	} else {
+		blockAB.VHB = make([]byte, 16)
+	}
+	if len(block.KED) == 32 {
+		blockAB.KED = block.KED
+	} else {
+		blockAB.KED = make([]byte, 32)
+	}
+	blockAB.VNF = uint8(block.VNF)
+	blockAB.AR = int16(block.AR)
+	for _, s := range block.Shards {
+		vhf := s.VHF
+		if len(vhf) != 16 {
+			vhf = make([]byte, 16)
+		}
+		blockAB.Shards = append(blockAB.Shards, &ytab.Shard{VHF: vhf, NodeID: uint32(s.NodeID), NodeID2: uint32(s.NodeID2)})
+	}
+	return blockAB
+}
+
 // Convert convert Block strcut to BlockMsg
 func (block *Block) Convert() *pb.BlockMsg {
 	msg := &pb.BlockMsg{
-		Id:   block.ID,
-		Vnf:  block.VNF,
-		Ar:   block.AR,
-		SnID: block.SnID,
+		Id:  block.ID,
+		Vhp: block.VHP,
+		Vhb: block.VHB,
+		Ked: block.KED,
+		Vnf: block.VNF,
+		Ar:  block.AR,
+		//SnID: block.SnID,
 	}
 	for _, s := range block.Shards {
 		msg.Shards = append(msg.Shards, s.Convert())
@@ -125,9 +160,12 @@ func (block *Block) Convert() *pb.BlockMsg {
 // Fillby convert BlockMsg to Block struct
 func (block *Block) Fillby(msg *pb.BlockMsg) {
 	block.ID = msg.Id
+	block.VHP = msg.Vhp
+	block.VHB = msg.Vhb
+	block.KED = msg.Ked
 	block.VNF = msg.Vnf
 	block.AR = msg.Ar
-	block.SnID = msg.SnID
+	//block.SnID = msg.SnID
 	for _, s := range msg.Shards {
 		shard := new(Shard)
 		shard.Fillby(s)
@@ -154,12 +192,11 @@ func (block *Block) ConvertBytes() ([]byte, error) {
 // Convert convert Shard strcut to ShardMsg
 func (shard *Shard) Convert() *pb.ShardMsg {
 	return &pb.ShardMsg{
-		Id:        shard.ID,
-		NodeID:    shard.NodeID,
-		Vhf:       shard.VHF,
-		BlockID:   shard.BlockID,
-		NodeID2:   shard.NodeID2,
-		Timestamp: time.Now().Unix(),
+		Id:     shard.ID,
+		NodeID: shard.NodeID,
+		Vhf:    shard.VHF,
+		//BlockID:   shard.BlockID,
+		NodeID2: shard.NodeID2,
 	}
 }
 
@@ -168,7 +205,7 @@ func (shard *Shard) Fillby(msg *pb.ShardMsg) {
 	shard.ID = msg.Id
 	shard.NodeID = msg.NodeID
 	shard.VHF = msg.Vhf
-	shard.BlockID = msg.BlockID
+	//shard.BlockID = msg.BlockID
 	shard.NodeID2 = msg.NodeID2
 }
 

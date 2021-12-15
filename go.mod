@@ -19,5 +19,6 @@ require (
 	github.com/tebeka/strftime v0.1.5 // indirect
 	github.com/tikv/client-go v0.0.0-20210303085855-1be793c46812
 	github.com/tylerb/graceful v1.2.15
+	github.com/yottachain/yotta-arraybase v0.0.3
 	go.mongodb.org/mongo-driver v1.3.3
 )

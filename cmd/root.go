@@ -167,6 +167,14 @@ var (
 	DefaultClientWaitTime int = 60
 	//DefaultClientSkipTime default value of ClientSkipTime
 	DefaultClientSkipTime int = 180
+	//DefaultClientArrayBaseBaseDir default value of ClientArrayBaseBaseDir
+	DefaultClientArrayBaseBaseDir string = ""
+	//DefaultClientArrayBaseRowsPerFile default value of ClientArrayBaseRowsPerFile
+	DefaultClientArrayBaseRowsPerFile uint64 = 10000000
+	//DefaultClientArrayBaseReadBufLen default value of ClientArrayBaseReadBufLen
+	DefaultClientArrayBaseReadBufLen int = 10
+	//DefaultClientArrayBaseWriteBufLen default value of ClientArrayBaseWriteBufLen
+	DefaultClientArrayBaseWriteBufLen int = 10
 
 	//DefaultLoggerOutput default value of LoggerOutput
 	DefaultLoggerOutput string = "stdout"
@@ -209,6 +217,14 @@ func initFlag() {
 	viper.BindPFlag(ytsync.ClientWaitTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ClientWaitTimeField))
 	rootCmd.PersistentFlags().Int(ytsync.ClientSkipTimeField, DefaultClientSkipTime, "ensure not to fetching rebuilt shards till the end")
 	viper.BindPFlag(ytsync.ClientSkipTimeField, rootCmd.PersistentFlags().Lookup(ytsync.ClientSkipTimeField))
+	rootCmd.PersistentFlags().String(ytsync.ClientArrayBaseBaseDirField, DefaultClientArrayBaseBaseDir, "base directory of arraybase")
+	viper.BindPFlag(ytsync.ClientArrayBaseBaseDirField, rootCmd.PersistentFlags().Lookup(ytsync.ClientArrayBaseBaseDirField))
+	rootCmd.PersistentFlags().Uint64(ytsync.ClientArrayBaseRowsPerFileField, DefaultClientArrayBaseRowsPerFile, "rows count per file of arraybase")
+	viper.BindPFlag(ytsync.ClientArrayBaseRowsPerFileField, rootCmd.PersistentFlags().Lookup(ytsync.ClientArrayBaseRowsPerFileField))
+	rootCmd.PersistentFlags().Int(ytsync.ClientArrayBaseReadBufLenField, DefaultClientArrayBaseReadBufLen, "read buffer length of arraybase")
+	viper.BindPFlag(ytsync.ClientArrayBaseReadBufLenField, rootCmd.PersistentFlags().Lookup(ytsync.ClientArrayBaseReadBufLenField))
+	rootCmd.PersistentFlags().Int(ytsync.ClientArrayBaseWriteBufLenField, DefaultClientArrayBaseWriteBufLen, "write buffer length of arraybase")
+	viper.BindPFlag(ytsync.ClientArrayBaseWriteBufLenField, rootCmd.PersistentFlags().Lookup(ytsync.ClientArrayBaseWriteBufLenField))
 	//logger config
 	rootCmd.PersistentFlags().String(ytsync.LoggerOutputField, DefaultLoggerOutput, "Output type of logger(stdout or file)")
 	viper.BindPFlag(ytsync.LoggerOutputField, rootCmd.PersistentFlags().Lookup(ytsync.LoggerOutputField))
