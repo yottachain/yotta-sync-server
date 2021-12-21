@@ -6,19 +6,51 @@ server:
   sn-id: 0
   skip-time: 300
 client:
-  mongodb-url: "mongodb://127.0.0.1:27017/?retryWrites=true"
-  db-name: "metabase"
+  bind-addr: ":8083"
+  pd-urls:
+  - "192.168.1.21:2379"
+  - "192.168.1.64:2379"
+  - "192.168.1.81:2379"
   all-sync-urls:
-  - "http://192.168.36.132:8051"
-  - "http://192.168.36.132:8052"
-  - "http://192.168.36.132:8053"
+  - "http://192.168.1.145:8087"
+  - "http://192.168.1.144:8087"
+  - "http://192.168.1.133:8087"
   start-time: 0
   batch-size: 100
   wait-time: 30
   skip-time: 300
+  arraybase:
+    base-dir: "e:\\arraybase"
+    rows-per-file: 10000000
+    read-buf-len: 10
+    write-buf-len: 10
 logger:
   output: "file"
   file-path: "./sync.log"
   rotation-time: 24
   max-age: 240
-  level: "Info"
+  level: "Debug"
+
+#client:
+#  bind-addr: ":8080"
+#  pd-urls: 
+#  - "127.0.0.1:2379"
+#  all-sync-urls:
+#  - "http://192.168.36.132:8051"
+#  - "http://192.168.36.132:8052"
+#  - "http://192.168.36.132:8053"
+#  start-time: 0
+#  batch-size: 100
+#  wait-time: 30
+#  skip-time: 300
+#  arraybase:
+#    base-dir: "/mnt/arraybase"
+#    rows-per-file: 10000000
+#    read-buf-len: 10
+#    write-buf-len: 10
+#logger:
+#  output: "file"
+#  file-path: "./sync.log"
+#  rotation-time: 24
+#  max-age: 240
+#  level: "Info"

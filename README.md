@@ -23,10 +23,9 @@ server:
   skip-time: 300
 #客户端配置
 client:
-  #客户端的同步数据库URL
-  mongodb-url: "mongodb://127.0.0.1:27017/?retryWrites=true"
-  #同步数据库名
-  db-name: "metabase"
+  #客户端的TIKV集群的PD URLs
+  pd-urls: 
+  - "127.0.0.1:2379"
   #要连接的服务端地址，按SN编号顺序依次配置
   all-sync-urls:
   - "http://127.0.0.1:8051"
@@ -68,8 +67,31 @@ $ nohup ./yotta-sync-server client &
 ```
 
 # 3. 数据库配置
-需要为同步库metabase的shards表建立索引
 ```
-mongoshell> use metabase
-mongoshell> db.shards.createIndex({nodeId:1, _id:1})
+CREATE DATABASE `metabase`;
+CREATE TABLE `blocks` (
+  `id` bigint(20) NOT NULL,
+  `vnf` int(11) NOT NULL,
+  `ar` int(11) NOT NULL,
+  `snid` int(11) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE `shards` (
+  `id` bigint(20) NOT NULL,
+  `nid` int(11) NOT NULL,
+  `vhf` binary(16) NOT NULL,
+  `bid` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`,`nid`),
+  KEY `nid_id` (`nid`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+PARTITION BY HASH(nid)
+PARTITIONS 50;
+
+CREATE TABLE `checkpoint` (
+  `id` int(11) NOT NULL,
+  `start` bigint(20) NOT NULL,
+  `timestamp` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 ```

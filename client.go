@@ -7,95 +7,99 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/tylerb/graceful"
+	ytab "github.com/yottachain/yotta-arraybase"
 )
+
+var checkPoints map[int32]int64
 
 //Client client struct
 type Client struct {
+	server    *echo.Echo
 	httpCli   *http.Client
-	dbCli     *mongo.Client
-	dbName    string
+	tikvCli   *TikvDao
+	arraybase *ytab.ArrayBase
 	SyncURLs  []string
 	StartTime int32
 	BatchSize int
 	WaitTime  int
 	SkipTime  int
+	lock      sync.RWMutex
 }
 
 //NewClient create a new client instance
-func NewClient(ctx context.Context, mongoDBURL, dbName string, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
+func NewClient(ctx context.Context, baseDir string, rowsPerFile uint64, readChLen, writeChLen int, pdURLs []string, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
 	entry := log.WithFields(log.Fields{Function: "NewClient"})
-	dbClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoDBURL))
+	tikvCli, err := NewTikvDao(ctx, pdURLs)
 	if err != nil {
-		entry.WithError(err).Errorf("creating mongo DB client failed: %s", mongoDBURL)
+		entry.WithError(err).Errorf("creating tikv client failed: %v", pdURLs)
 		return nil, err
 	}
-	entry.Infof("mongoDB connected: %s", mongoDBURL)
-	return &Client{httpCli: &http.Client{}, dbCli: dbClient, dbName: dbName, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
+	server := echo.New()
+	arraybase, err := ytab.InitArrayBase(ctx, baseDir, rowsPerFile, readChLen, writeChLen)
+	if err != nil {
+		entry.WithError(err).Errorf("creating arraybase failed: basedir->%s, rowsperfile->%d, readchlen->%d, writechlen->%d", baseDir, rowsPerFile, readChLen, writeChLen)
+		return nil, err
+	}
+	return &Client{server: server, httpCli: &http.Client{}, tikvCli: tikvCli, arraybase: arraybase, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
 }
 
 //StartClient start client service
-func (cli *Client) StartClient(ctx context.Context) error {
+func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
+	checkPoints = make(map[int32]int64)
 	urls := cli.SyncURLs
 	snCount := len(urls)
-	blocksTab := cli.dbCli.Database(cli.dbName).Collection(BlocksTab)
-	shardsTab := cli.dbCli.Database(cli.dbName).Collection(ShardsTab)
-	checkPointTab := cli.dbCli.Database(cli.dbName).Collection(CheckPointTab)
-	recordTab := cli.dbCli.Database(cli.dbName).Collection(RecordTab)
+	for i := 0; i < snCount; i++ {
+		snID := int32(i)
+		checkPoints[snID] = 0
+	}
+	cli.server.Use(middleware.Logger())
+	cli.server.Use(middleware.Recover())
+	cli.server.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 5,
+	}))
+	cli.server.GET("getCheckPoints", cli.GetCheckPoints)
+	cli.server.GET("getBlocks", cli.GetBlocks)
+	cli.server.Server.Addr = bindAddr
+	go func() {
+		err := graceful.ListenAndServe(cli.server.Server, 5*time.Second)
+		if err != nil {
+			log.WithError(err).Errorf("start http server failed: %s", bindAddr)
+		}
+	}()
+
 	for i := 0; i < snCount; i++ {
 		snID := int32(i)
 		go func() {
 			entry := log.WithFields(log.Fields{Function: "StartClient", SNID: snID})
 			entry.Info("starting synchronization process")
 			for {
-				checkPoint := new(CheckPoint)
-				err := checkPointTab.FindOne(ctx, bson.M{"_id": snID}).Decode(checkPoint)
+				checkPoint, err := cli.tikvCli.FindCheckPoint(ctx, snID)
 				if err != nil {
-					if err == mongo.ErrNoDocuments {
-						entry.Infof("cannot find checkpoint of SN%d, read record info...", snID)
-						record := new(Record)
-						err := recordTab.FindOne(ctx, bson.M{"sn": snID}).Decode(record)
+					if err == NoValError {
+						entry.Infof("cannot find checkpoint of SN%d, read start time from config file...", snID)
+						startBytes32 := Int32ToBytes(cli.StartTime)
+						padding := []byte{0x00, 0x00, 0x00, 0x00}
+						startTime64 := BytesToInt64(append(startBytes32, padding...))
+						checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
+						err := cli.tikvCli.InsertCheckPoint(ctx, checkPoint)
 						if err != nil {
-							if err == mongo.ErrNoDocuments {
-								entry.Infof("cannot find record of SN%d, read start time from config file...", snID)
-								startBytes32 := Int32ToBytes(cli.StartTime)
-								padding := []byte{0x00, 0x00, 0x00, 0x00}
-								startTime64 := BytesToInt64(append(startBytes32, padding...))
-								checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
-								_, err = checkPointTab.InsertOne(context.Background(), checkPoint)
-								if err != nil {
-									entry.WithError(err).Errorf("insert checkpoint: %d", snID)
-									time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-									continue
-								}
-								entry.Infof("insert checkpoint of SN%d: %d", snID, checkPoint.Start)
-							} else {
-								entry.WithError(err).Errorf("find record of SN%d", snID)
-								time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-								continue
-							}
-						} else {
-							entry.Infof("find record of SN%d, migrante to checkpoint table...", snID)
-							startBytes32 := Int32ToBytes(record.StartTime)
-							padding := []byte{0x00, 0x00, 0x00, 0x00}
-							startTime64 := BytesToInt64(append(startBytes32, padding...))
-							checkPoint = &CheckPoint{ID: snID, Start: startTime64, Timestamp: time.Now().Unix()}
-							_, err = checkPointTab.InsertOne(context.Background(), checkPoint)
-							if err != nil {
-								entry.WithError(err).Errorf("insert checkpoint: %d", snID)
-								time.Sleep(time.Duration(cli.WaitTime) * time.Second)
-								continue
-							}
-							entry.Infof("migrante to checkpoint table of SN%d: %d", snID, checkPoint.Start)
+							entry.WithError(err).Errorf("insert checkpoint: %d", snID)
+							time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+							continue
 						}
+						entry.Infof("insert checkpoint of SN%d: %d", snID, checkPoint.Start)
+						cli.lock.Lock()
+						checkPoints[snID] = int64(cli.StartTime) * 1000000000
+						cli.lock.Unlock()
 					} else {
 						entry.WithError(err).Errorf("find checkpoint of SN%d", snID)
 						time.Sleep(time.Duration(cli.WaitTime) * time.Second)
@@ -112,127 +116,237 @@ func (cli *Client) StartClient(ctx context.Context) error {
 				if snID != int32(resp.SNID) {
 					entry.Fatalf("received SN ID not match current process: %d", resp.SNID)
 				}
-				entry.Debugf("received response of SN%d: %d blocks, %d shards, %d rebuilds, %s", resp.SNID, len(resp.Blocks), len(resp.Shards), len(resp.Rebuilds), func() string {
-					if resp.More == true {
+				entry.Debugf("received response of SN%d: %d blocks, %d rebuilds, %s", resp.SNID, len(resp.Blocks), len(resp.Rebuilds), func() string {
+					if resp.More {
 						return "have more data"
 					}
 					return "no more data"
 				}())
-				opt := new(options.InsertManyOptions)
-				ordered := false
-				opt.Ordered = &ordered
-				var innerErr *error
-				var wg sync.WaitGroup
-				wg.Add(3)
-				go func() {
-					//insert blocks
-					defer wg.Done()
-					if len(resp.Blocks) > 0 {
-						var ifBlocks []interface{}
-						for _, b := range resp.Blocks {
-							b.SnID = resp.SNID
-							ifBlocks = append(ifBlocks, b)
-						}
-						result, err := blocksTab.InsertMany(ctx, ifBlocks, opt)
-						if result != nil {
-							entry.Infof("%d blocks inserted", len(result.InsertedIDs))
-							if err != nil {
-								//entry.WithError(err).Tracef("inserting blocks")
-								bulkException, ok := err.(mongo.BulkWriteException)
-								if ok {
-									if bulkException.WriteConcernError != nil {
-										entry.WithError(bulkException.WriteConcernError).Errorf("insert blocks of SN%d", snID)
-										innerErr = &err
-									} else {
-										for _, e := range bulkException.WriteErrors {
-											if e.Code != 11000 {
-												entry.WithError(e).Errorf("insert blocks of SN%d", snID)
-												innerErr = &err
-												break
-											}
-										}
-									}
-								} else {
-									entry.WithError(err).Errorf("insert blocks of SN%d", snID)
-									innerErr = &err
-								}
-							}
-						} else if err != nil {
-							entry.WithError(err).Errorf("insert blocks of SN%d", snID)
-							innerErr = &err
-						}
-					}
-				}()
-				go func() {
-					//insert shards
-					defer wg.Done()
-					if len(resp.Shards) > 0 {
-						var ifShards []interface{}
-						for _, s := range resp.Shards {
-							ifShards = append(ifShards, s)
-						}
-						result, err := shardsTab.InsertMany(ctx, ifShards, opt)
-						if result != nil {
-							entry.Infof("%d shards inserted", len(result.InsertedIDs))
-							if err != nil {
-								//entry.WithError(err).Tracef("inserting shards")
-								bulkException, ok := err.(mongo.BulkWriteException)
-								if ok {
-									if bulkException.WriteConcernError != nil {
-										entry.WithError(bulkException.WriteConcernError).Errorf("insert shards of SN%d", snID)
-										innerErr = &err
-									} else {
-										for _, e := range bulkException.WriteErrors {
-											if e.Code != 11000 {
-												entry.WithError(e).Errorf("insert shards of SN%d", snID)
-												innerErr = &err
-												break
-											}
-										}
-									}
-								} else {
-									entry.WithError(err).Errorf("insert shards of SN%d", snID)
-									innerErr = &err
-								}
-							}
-						} else if err != nil {
-							entry.WithError(err).Errorf("insert shards of SN%d", snID)
-							innerErr = &err
-						}
-					}
-				}()
-				go func() {
-					//update rebuilt shards
-					defer wg.Done()
-					if len(resp.Rebuilds) > 0 {
-						var i int64 = 0
-						for _, r := range resp.Rebuilds {
-							result, err := shardsTab.UpdateOne(ctx, bson.M{"_id": r.VFI, "nodeId": r.SID}, bson.M{"$set": bson.M{"nodeId": r.NID}})
-							if result != nil {
-								entry.Tracef("%d shards updated: %d", result.ModifiedCount, r.VFI)
-								i += result.ModifiedCount
-							} else if err != nil {
-								entry.WithError(err).Errorf("update shards of SN%d: %d", snID, r.VFI)
-								innerErr = &err
-								return
-							}
-						}
-						entry.Infof("%d shards rebuilt", i)
-					}
-				}()
-				wg.Wait()
-				if innerErr != nil {
+				//block转换为arraybase格式
+				blocksAB := make([]*ytab.Block, 0)
+				for _, b := range resp.Blocks {
+					blocksAB = append(blocksAB, b.ConvertToAB())
+				}
+				//重建数据转换为arraybase格式
+				rebuildsAB, err := cli.tikvCli.FindShardMetas(ctx, resp.Rebuilds)
+				if err != nil {
+					entry.WithError(err).Errorf("Convert rebuild metas of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
-				_, err = checkPointTab.UpdateOne(ctx, bson.M{"_id": snID}, bson.M{"$set": bson.M{"start": resp.Next, "timestamp": time.Now().Unix()}})
+				//删除数据转换为arraybase格式
+				deletesAB, err := cli.tikvCli.FindDeleteMetas(ctx, resp.BlockDel)
+				if err != nil {
+					entry.WithError(err).Errorf("Convert delete metas of SN%d", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				// //预处理tikv中要删除的block
+				// deletedIDs := make([]uint64, 0)
+				// for _, bdel := range deletesAB {
+				// 	deletedIDs = append(deletedIDs, bdel)
+				// }
+				dblocks, err := cli.arraybase.Read(deletesAB)
+				if err != nil {
+					entry.WithError(err).Errorf("read blocks of SN%d before deleted", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				deletedKeys := make([][]byte, 0)
+				for _, dblk := range dblocks {
+					for k, v := range dblk.Shards {
+						//deletedKeys = append(deletedKeys, []byte(shardmetasKey(int64(dblk.ID)+int64(k))))
+						if v.NodeID != 0 {
+							deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID))))
+						}
+						if v.NodeID2 != 0 {
+							deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID2))))
+						}
+					}
+				}
+				//先把重建中的源分片删除
+				for _, rebuild := range resp.Rebuilds {
+					deletedKeys = append(deletedKeys, []byte(shardsNodeKey(rebuild.VFI, rebuild.SID)))
+				}
+				err = cli.tikvCli.BatchDelete(ctx, deletedKeys, 10000)
+				if err != nil {
+					entry.WithError(err).Errorf("delete node shards of SN%d", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				//修改写入arraybase
+				from, to, err := cli.arraybase.Write(blocksAB, rebuildsAB, deletesAB)
+				if err != nil {
+					entry.WithError(err).Errorf("write arraybase of SN%d", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				//shard写入tikv
+				err = cli.tikvCli.InsertShardMetas(ctx, blocksAB, from, to)
+				if err != nil {
+					entry.WithError(err).Errorf("insert shard metas of SN%d", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				//写入重建后分片
+				err = cli.tikvCli.InsertNodeShards(ctx, cli.arraybase, rebuildsAB)
+				if err != nil {
+					entry.WithError(err).Errorf("update rebuilt shards of SN%d", snID)
+					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+					continue
+				}
+				// rebuildIndexes := make([]uint64, 0)
+				// for _, v := range rebuildsAB {
+				// 	rebuildIndexes = append(rebuildIndexes, v.BIndex)
+				// }
+				// rebuildBlocks, err := cli.arraybase.Read(rebuildIndexes)
+				// if err != nil {
+				// 	entry.WithError(err).Errorf("read rebuilt blocks of SN%d", snID)
+				// 	time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+				// 	continue
+				// }
+				// keys := make([][]byte, 0)
+				// vals := make([][]byte, 0)
+				// for _, v := range rebuildsAB {
+				// 	r := rebuildBlocks[v.BIndex]
+				// 	if r.ID == 0 {
+				// 		continue
+				// 	}
+				// 	keys = append(keys, []byte(shardsNodeKey(int64(r.ID)+int64(v.Offset), int32(r.Shards[int(v.Offset)].NodeID))))
+				// 	msg := new(pb.ShardMsg)
+				// 	msg.Id = int64(r.ID) + int64(v.Offset)
+				// 	msg.Vhf = r.Shards[int(v.Offset)].VHF
+				// 	msg.Bindex = v.BIndex
+				// 	msg.NodeID = int32(r.Shards[int(v.Offset)].NodeID)
+				// 	msg.NodeID2 = int32(r.Shards[int(v.Offset)].NodeID2)
+				// 	msg.Timestamp = time.Now().Unix()
+				// 	buf, err := proto.Marshal(msg)
+				// 	if err != nil {
+				// 		entry.WithError(err).Errorf("convert ShardMsg error: %v", msg)
+				// 		break
+				// 	}
+				// 	vals = append(vals, buf)
+				// 	if r.Shards[int(v.Offset)].NodeID2 != 0 {
+				// 		keys = append(keys, []byte(shardsNodeKey(int64(r.ID)+int64(v.Offset), int32(r.Shards[int(v.Offset)].NodeID2))))
+				// 		vals = append(vals, buf)
+				// 	}
+				// }
+				// err = cli.tikvCli.cli.BatchPut(ctx, keys, vals)
+				// if err != nil {
+				// 	entry.WithError(err).Errorf("update rebuilt shards of SN%d", snID)
+				// 	time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+				// 	continue
+				// }
+				// //err = cli.tikvCli.BatchDelete(ctx, deletedKeys, 10000)
+				// err = cli.tikvCli.cli.BatchDelete(ctx, deletedKeys)
+				// if err != nil {
+				// 	entry.WithError(err).Errorf("delete shard metas and node shards of SN%d", snID)
+				// 	time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+				// 	continue
+				// }
+
+				// var innerErr *error
+				// var wg sync.WaitGroup
+				// wg.Add(4)
+				// go func() {
+				// 	defer wg.Done()
+				// 	if len(resp.Blocks) > 0 {
+				// 		// for _, b := range resp.Blocks {
+				// 		// 	b.SnID = int32(resp.SNID)
+				// 		// }
+				// 		err := cli.tikvCli.InsertBlocks(ctx, resp.Blocks)
+				// 		if err != nil {
+				// 			entry.WithError(err).Errorf("insert blocks of SN%d", snID)
+				// 			innerErr = &err
+				// 		} else {
+				// 			entry.Infof("%d blocks inserted", len(resp.Blocks))
+				// 		}
+				// 	}
+				// }()
+				// go func() {
+				// 	//insert shards
+				// 	defer wg.Done()
+				// 	if len(resp.Blocks) > 0 {
+				// 		shards := make([]*Shard, 0)
+				// 		for _, b := range resp.Blocks {
+				// 			shards = append(shards, b.Shards...)
+				// 		}
+				// 		err := cli.tikvCli.InsertShards(ctx, shards)
+				// 		if err != nil {
+				// 			entry.WithError(err).Errorf("insert shards of SN%d", snID)
+				// 			innerErr = &err
+				// 		} else {
+				// 			entry.Infof("%d shards inserted", len(shards))
+				// 		}
+				// 	}
+				// }()
+				// go func() {
+				// 	//update rebuilt shards
+				// 	defer wg.Done()
+				// 	if len(resp.Rebuilds) > 0 {
+				// 		var count int64 = 10000
+				// 		metas := make([][]*ShardRebuildMeta, 0)
+				// 		max := int64(len(resp.Rebuilds))
+				// 		if max < count {
+				// 			metas = append(metas, resp.Rebuilds)
+				// 		} else {
+				// 			var quantity int64
+				// 			if max%count == 0 {
+				// 				quantity = max / count
+				// 			} else {
+				// 				quantity = (max / count) + 1
+				// 			}
+				// 			var start, end, i int64
+				// 			for i = 1; i <= quantity; i++ {
+				// 				end = i * count
+				// 				if i != quantity {
+				// 					metas = append(metas, resp.Rebuilds[start:end])
+				// 				} else {
+				// 					metas = append(metas, resp.Rebuilds[start:])
+				// 				}
+				// 				start = i * count
+				// 			}
+				// 		}
+				// 		for index, m := range metas {
+				// 			err := cli.tikvCli.UpdateShards(ctx, m)
+				// 			if err != nil {
+				// 				entry.WithError(err).Errorf("update shards of SN%d: %d", snID, index)
+				// 				innerErr = &err
+				// 			} else {
+				// 				entry.Infof("%d shards rebuilt: %d", len(m), index)
+				// 			}
+				// 		}
+				// 	}
+				// }()
+				// go func() {
+				// 	//delete blocks
+				// 	defer wg.Done()
+				// 	if len(resp.BlockDel) > 0 {
+				// 		err := cli.tikvCli.DeleteBlocks(ctx, resp.BlockDel)
+				// 		if err != nil {
+				// 			entry.WithError(err).Errorf("update shards of SN%d", snID)
+				// 			innerErr = &err
+				// 		} else {
+				// 			entry.Infof("%d shards delete", len(resp.BlockDel))
+				// 		}
+				// 	}
+				// }()
+				// wg.Wait()
+				// if innerErr != nil {
+				// 	time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+				// 	continue
+				// }
+				err = cli.tikvCli.InsertCheckPoint(ctx, &CheckPoint{ID: snID, Start: resp.Next, Timestamp: time.Now().Unix()})
 				if err != nil {
 					entry.WithError(err).Errorf("update checkpoint of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
 				entry.Debugf("update checkpoint to %d", resp.Next)
-				if resp.More == false {
+				cli.lock.Lock()
+				checkPoints[snID] = (resp.Next >> 32) * 1000000000
+				cli.lock.Unlock()
+				if !resp.More {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 				}
 			}
@@ -274,8 +388,52 @@ func GetSyncData(httpCli *http.Client, url string, from int64, size int, skip in
 		entry.WithError(err).Errorf("decode sync data failed: %s", fullURL)
 		return nil, err
 	}
-	sort.Slice(response.Shards[:], func(i, j int) bool {
-		return response.Shards[i].NodeID < response.Shards[j].NodeID
-	})
+	// sort.Slice(response.Shards[:], func(i, j int) bool {
+	// 	return response.Shards[i].NodeID < response.Shards[j].NodeID
+	// })
 	return response, nil
+}
+
+//GetCheckPoints fetch checkpoints
+func (cli *Client) GetCheckPoints(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetCheckPoints"})
+	cli.lock.RLock()
+	b, err := json.Marshal(checkPoints)
+	cli.lock.RUnlock()
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
+}
+
+//GetCheckPoints fetch checkpoints
+func (cli *Client) GetBlocks(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetBlocks"})
+	bindexesStr := c.QueryParam("bindexes")
+	bindexesArr := strings.Split(bindexesStr, ",")
+	bindexes := make([]uint64, 0)
+	for _, s := range bindexesArr {
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			entry.WithError(err).Errorf("parse bindex failed: %s", s)
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+		bindexes = append(bindexes, n)
+	}
+	dblocks, err := cli.arraybase.Read(bindexes)
+	if err != nil {
+		entry.WithError(err).Error("read blocks failed")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	// blocks := make([]*ytab.Block, 0)
+	// for _, i := range bindexes {
+	// 	blocks = append(blocks, dblocks[i])
+	// }
+	b, err := json.Marshal(dblocks)
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
 }

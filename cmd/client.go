@@ -22,11 +22,11 @@ var clientCmd = &cobra.Command{
 			panic(fmt.Sprintf("unable to decode into config struct, %v\n", err))
 		}
 		initLog(config)
-		client, err := ytsync.NewClient(context.Background(), config.Client.MongoDBURL, config.Client.DBName, config.Client.AllSyncURLs, config.Client.StartTime, config.Client.BatchSize, config.Client.WaitTime, config.Client.SkipTime)
+		client, err := ytsync.NewClient(context.Background(), config.Client.ArrayBase.BaseDir, config.Client.ArrayBase.RowsPerFile, config.Client.ArrayBase.ReadBufLen, config.Client.ArrayBase.WriteBufLen, config.Client.PDURLs, config.Client.AllSyncURLs, config.Client.StartTime, config.Client.BatchSize, config.Client.WaitTime, config.Client.SkipTime)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when creating synchronization client: %s\n", err))
 		}
-		err = client.StartClient(context.Background())
+		err = client.StartClient(context.Background(), config.Client.BindAddr)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when starting synchronization client: %s\n", err))
 		}
