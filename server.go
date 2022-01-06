@@ -58,6 +58,7 @@ func (server *Server) StartServer(bindAddr string) error {
 	server.server.GET("sync/getShardRebuildMetas", server.GetRebuildData)
 	server.server.GET("sync/GetStoredShards", server.GetStoredShards)
 	server.server.GET("sync/getMinerLogs", server.GetMinerLogs)
+	server.server.GET("sync/getMiners", server.GetMiners)
 	server.server.Server.Addr = bindAddr
 	err := graceful.ListenAndServe(server.server.Server, 5*time.Second)
 	if err != nil {
@@ -147,6 +148,28 @@ func (server *Server) GetStoredShards(c echo.Context) error {
 	}
 	if resp == nil {
 		resp = make([]*Shard, 0)
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
+}
+
+//GetMiners fetch miner infos
+func (server *Server) GetMiners(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetMiners"})
+	q := new(RebuildQuery)
+	if err := c.Bind(q); err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	resp, err := server.dao.GetMiners(context.Background(), q.Start, q.Count)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if resp == nil {
+		resp = make([]*Node, 0)
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -467,6 +490,37 @@ func (dao *ServerDao) GetStoredShards(ctx context.Context, from, to int64) ([]*S
 		return nil, *innerErr
 	}
 	return append(shards1, shards2...), nil
+}
+
+//GetMiners get miner infos in period
+func (dao *ServerDao) GetMiners(ctx context.Context, start, count int64) ([]*Node, error) {
+	entry := log.WithFields(log.Fields{Function: "GetMiners"})
+	if count == 0 {
+		err := fmt.Errorf("invalid parameters: start -> %d, count -> %d", start, count)
+		entry.WithError(err).Error("invalid parameters")
+		return nil, err
+	}
+	minerTab := dao.dbCli.Database(dao.minerDBName).Collection(NodeTab)
+	miners := make([]*Node, 0)
+	opts := new(options.FindOptions)
+	opts.Sort = bson.M{"_id": 1}
+	opts.Limit = &count
+	cur, err := minerTab.Find(ctx, bson.M{"_id": bson.M{"$gte": start}}, opts)
+	if err != nil {
+		entry.WithError(err).Errorf("traversal miner infos: start -> %d, count -> %d", start, count)
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		miner := new(Node)
+		err := cur.Decode(miner)
+		if err != nil {
+			entry.WithError(err).Errorf("decoding miner info failed: start -> %d, count -> %d", start, count)
+			return nil, err
+		}
+		miners = append(miners, miner)
+	}
+	return miners, nil
 }
 
 //GetMinerLogs get miner logs in period

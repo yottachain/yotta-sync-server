@@ -4,6 +4,7 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	ytab "github.com/yottachain/yotta-arraybase"
 	pb "github.com/yottachain/yotta-sync-server/pb"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (
@@ -34,6 +35,8 @@ const (
 	RecordTab = "record"
 	//CorruptBlockTab block_corrupt table
 	CorruptBlockTab = "block_corrupt"
+	//NodeTab Node table
+	NodeTab = "Node"
 	//NodeLogTab NodeLog table
 	NodeLogTab = "NodeLog"
 )
@@ -98,6 +101,82 @@ type Record struct {
 	StartTime int32 `bson:"start"`
 	EndTime   int32 `bson:"end"`
 	Sn        int32 `bson:"sn"`
+}
+
+//Node struct
+type Node struct {
+	//data node index
+	ID int32 `bson:"_id" json:"_id"`
+	//data node ID, generated from PubKey
+	NodeID string `bson:"nodeid" json:"nodeid"`
+	//public key of data node
+	PubKey string `bson:"pubkey" json:"pubkey"`
+	//owner account of this miner
+	Owner string `bson:"owner" json:"owner"`
+	//profit account of this miner
+	ProfitAcc string `bson:"profitAcc" json:"profitAcc"`
+	//ID of associated miner pool
+	PoolID string `bson:"poolID" json:"poolID"`
+	//Owner of associated miner pool
+	PoolOwner string `bson:"poolOwner" json:"poolOwner"`
+	//quota allocated by associated miner pool
+	Quota int64 `bson:"quota" json:"quota"`
+	//listening addresses of data node
+	Addrs []string `bson:"addrs" json:"addrs"`
+	//CPU usage of data node
+	CPU int32 `bson:"cpu" json:"cpu"`
+	//memory usage of data node
+	Memory int32 `bson:"memory" json:"memory"`
+	//bandwidth usage of data node
+	Bandwidth int32 `bson:"bandwidth" json:"bandwidth"`
+	//max space of data node
+	MaxDataSpace int64 `bson:"maxDataSpace" json:"maxDataSpace"`
+	//space assigned to YTFS
+	AssignedSpace int64 `bson:"assignedSpace" json:"assignedSpace"`
+	//pre-allocated space of data node
+	ProductiveSpace int64 `bson:"productiveSpace" json:"productiveSpace"`
+	//used space of data node
+	UsedSpace int64 `bson:"usedSpace" json:"usedSpace"`
+	//used spaces on each SN
+	Uspaces map[string]int64 `bson:"uspaces" json:"uspaces"`
+	//control weight manually
+	ManualWeight int32 `bson:"manualWeight" json:"manualWeight"`
+	//weight for allocate data node
+	Weight float64 `bson:"weight" json:"weight"`
+	//Is node valid
+	Valid int32 `bson:"valid" json:"valid"`
+	//Is relay node
+	Relay int32 `bson:"relay" json:"relay"`
+	//status code: 0 - registered 1 - active
+	Status int32 `bson:"status" json:"status"`
+	//timestamp of status updating operation
+	Timestamp int64 `bson:"timestamp" json:"timestamp"`
+	//version number of miner
+	Version int32 `bson:"version" json:"version"`
+	//Rebuilding if node is under rebuilding
+	Rebuilding int32 `bson:"rebuilding" json:"rebuilding"`
+	//RealSpace real space of miner
+	RealSpace int64 `bson:"realSpace" json:"realSpace"`
+	//Tx
+	Tx int64 `bson:"tx" json:"tx"`
+	//Rx
+	Rx int64 `bson:"rx" json:"rx"`
+	//Other
+	Other bson.A `bson:"other" json:"other"`
+	//ErrorCount
+	ErrorCount int64 `bson:"errorCount" json:"errorCount"`
+	//Unreadable
+	Unreadable bool `bson:"unreadable" json:"unreadable"`
+	//HashID
+	HashID string `bson:"hashID" json:"hashID"`
+	//BlCount
+	BlCount int32 `bson:"blCount" json:"blCount"`
+	//Filing
+	Filing bool `bson:"filing" json:"filing"`
+	//AllocatedSpace
+	AllocatedSpace int64 `bson:"allocatedSpace" json:"allocatedSpace"`
+	//AvailableSpace
+	AvailableSpace int64 `bson:"availableSpace" json:"availableSpace"`
 }
 
 //NodeLog log of node operation
