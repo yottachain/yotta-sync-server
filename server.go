@@ -86,6 +86,14 @@ type StoredShardsQuery struct {
 	To   int32 `json:"to" form:"to" query:"to"`
 }
 
+//MinerQuery struct
+type MinerQuery struct {
+	Start   int64 `json:"start" form:"start" query:"start"`
+	Count   int64 `json:"count" form:"count" query:"count"`
+	SNCount int64 `json:"sncount" form:"sncount" query:"sncount"`
+	SNIndex int64 `json:"snindex" form:"snindex" query:"snindex"`
+}
+
 //GetSyncData fetch sync data
 func (server *Server) GetSyncData(c echo.Context) error {
 	entry := log.WithFields(log.Fields{Function: "GetSyncData"})
@@ -160,11 +168,11 @@ func (server *Server) GetStoredShards(c echo.Context) error {
 //GetMiners fetch miner infos
 func (server *Server) GetMiners(c echo.Context) error {
 	entry := log.WithFields(log.Fields{Function: "GetMiners"})
-	q := new(RebuildQuery)
+	q := new(MinerQuery)
 	if err := c.Bind(q); err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	resp, err := server.dao.GetMiners(context.Background(), q.Start, q.Count)
+	resp, err := server.dao.GetMiners(context.Background(), q.Start, q.Count, q.SNCount, q.SNIndex)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -493,10 +501,10 @@ func (dao *ServerDao) GetStoredShards(ctx context.Context, from, to int64) ([]*S
 }
 
 //GetMiners get miner infos in period
-func (dao *ServerDao) GetMiners(ctx context.Context, start, count int64) ([]*Node, error) {
+func (dao *ServerDao) GetMiners(ctx context.Context, start, count, snCount, snIndex int64) ([]*Node, error) {
 	entry := log.WithFields(log.Fields{Function: "GetMiners"})
 	if count == 0 {
-		err := fmt.Errorf("invalid parameters: start -> %d, count -> %d", start, count)
+		err := fmt.Errorf("invalid parameters: start -> %d, count -> %d, snCount -> %d, snIndex -> %d", start, count, snCount, snIndex)
 		entry.WithError(err).Error("invalid parameters")
 		return nil, err
 	}
@@ -505,7 +513,7 @@ func (dao *ServerDao) GetMiners(ctx context.Context, start, count int64) ([]*Nod
 	opts := new(options.FindOptions)
 	opts.Sort = bson.M{"_id": 1}
 	opts.Limit = &count
-	cur, err := minerTab.Find(ctx, bson.M{"_id": bson.M{"$gte": start}}, opts)
+	cur, err := minerTab.Find(ctx, bson.M{"_id": bson.M{"$gte": start, "$mod": bson.A{snCount, snIndex}}}, opts)
 	if err != nil {
 		entry.WithError(err).Errorf("traversal miner infos: start -> %d, count -> %d", start, count)
 		return nil, err
@@ -515,7 +523,7 @@ func (dao *ServerDao) GetMiners(ctx context.Context, start, count int64) ([]*Nod
 		miner := new(Node)
 		err := cur.Decode(miner)
 		if err != nil {
-			entry.WithError(err).Errorf("decoding miner info failed: start -> %d, count -> %d", start, count)
+			entry.WithError(err).Errorf("decoding miner info failed: start -> %d, count -> %d, snCount -> %d, snIndex -> %d", start, count, snCount, snIndex)
 			return nil, err
 		}
 		miners = append(miners, miner)
