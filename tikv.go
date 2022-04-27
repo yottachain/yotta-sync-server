@@ -56,6 +56,26 @@ func (tikvDao *TikvDao) FindCheckPoint(ctx context.Context, id int32) (*CheckPoi
 	return checkPoint, nil
 }
 
+//FindShardMeta get shard meta by shard ID
+func (tikvDao *TikvDao) FindShardMeta(ctx context.Context, id int64) (*pb.ShardMetaMsg, error) {
+	entry := log.WithFields(log.Fields{Function: "FindShardMeta", ShardID: id})
+	buf, err := tikvDao.cli.Get(ctx, []byte(shardmetasKey(id)))
+	if err != nil {
+		entry.WithError(err).Error("find shard meta failed")
+		return nil, err
+	}
+	if buf == nil {
+		return nil, NoValError
+	}
+	msg := new(pb.ShardMetaMsg)
+	err = proto.Unmarshal(buf, msg)
+	if err != nil {
+		entry.WithError(err).Error("unmarshal shard meta failed")
+		return nil, err
+	}
+	return msg, nil
+}
+
 //FindShardMetas get shard metas by ShardRebuildMeta
 func (tikvDao *TikvDao) FindShardMetas(ctx context.Context, metas []*ShardRebuildMeta) ([]*ytab.ShardRebuildMeta, error) {
 	entry := log.WithFields(log.Fields{Function: "FindShardMetas"})
@@ -63,10 +83,10 @@ func (tikvDao *TikvDao) FindShardMetas(ctx context.Context, metas []*ShardRebuil
 		return nil, nil
 	}
 	keys := make([][]byte, 0)
-	tmap := make(map[int64]*ShardRebuildMeta)
+	tmap := make(map[int64][]*ShardRebuildMeta)
 	for _, m := range metas {
 		keys = append(keys, []byte(shardmetasKey(m.VFI)))
-		tmap[m.VFI] = m
+		tmap[m.VFI] = append(tmap[m.VFI], m)
 	}
 	bufs, err := tikvDao.BatchGet(ctx, keys, 10000)
 	if err != nil {
@@ -87,7 +107,9 @@ func (tikvDao *TikvDao) FindShardMetas(ctx context.Context, metas []*ShardRebuil
 		if msg.Timestamp > (metas[i].ID>>32)+60 {
 			continue
 		}
-		results = append(results, &ytab.ShardRebuildMeta{BIndex: msg.Bindex, Offset: uint8(msg.Offset), NID: uint32(tmap[msg.Id].NID), SID: uint32(tmap[msg.Id].SID)})
+		x := tmap[msg.Id][0]
+		tmap[msg.Id] = tmap[msg.Id][1:]
+		results = append(results, &ytab.ShardRebuildMeta{BIndex: msg.Bindex, Offset: uint8(msg.Offset), NID: uint32(x.NID), SID: uint32(x.SID)})
 	}
 	return results, nil
 }
@@ -157,7 +179,20 @@ func (tikvDao *TikvDao) FindDeleteMetas(ctx context.Context, metas []*BlockDel) 
 	}
 	keys := make([][]byte, 0)
 	for _, m := range metas {
-		keys = append(keys, []byte(shardmetasKey(m.VBI)))
+		if m.NID != 0 {
+			msg, err := tikvDao.FindShardMeta(ctx, m.VBI)
+			if err != nil {
+				if err == NoValError {
+					entry.Warnf("cannot find shard meta: %d", m.VBI)
+					continue
+				}
+				entry.WithError(err).Errorf("get shard meta of missing shard failed: %d", m.VBI)
+				return nil, err
+			}
+			keys = append(keys, []byte(shardmetasKey(msg.Id-int64(msg.Offset))))
+		} else {
+			keys = append(keys, []byte(shardmetasKey(m.VBI)))
+		}
 	}
 	bufs, err := tikvDao.BatchGet(ctx, keys, 10000)
 	if err != nil {

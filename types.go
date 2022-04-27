@@ -74,6 +74,7 @@ type ShardRebuildMeta struct {
 type BlockDel struct {
 	ID  int64 `bson:"_id" json:"_id"`
 	VBI int64 `bson:"VBI" json:"VBI"`
+	NID int32 `bson:"NID" json:"NID"`
 }
 
 //DataResp response data of sync server

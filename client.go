@@ -106,6 +106,8 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 						continue
 					}
 				}
+				start := time.Now().UnixMilli()
+				begin := start
 				entry.Debugf("ready for fetching sync data")
 				resp, err := GetSyncData(cli.httpCli, cli.SyncURLs[snID], checkPoint.Start, cli.BatchSize, cli.SkipTime)
 				if err != nil {
@@ -116,42 +118,51 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 				if snID != int32(resp.SNID) {
 					entry.Fatalf("received SN ID not match current process: %d", resp.SNID)
 				}
-				entry.Debugf("received response of SN%d: %d blocks, %d rebuilds, %s", resp.SNID, len(resp.Blocks), len(resp.Rebuilds), func() string {
+				entry.Debugf("received response of SN%d cost %d ms: %d blocks, %d rebuilds, %s", resp.SNID, time.Now().UnixMilli()-start, len(resp.Blocks), len(resp.Rebuilds), func() string {
 					if resp.More {
 						return "have more data"
 					}
 					return "no more data"
 				}())
 				//block转换为arraybase格式
+				start = time.Now().UnixMilli()
 				blocksAB := make([]*ytab.Block, 0)
 				for _, b := range resp.Blocks {
 					blocksAB = append(blocksAB, b.ConvertToAB())
 				}
+				entry.Debugf("convert format of blocks in SN%d to arraybase format, cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				//重建数据转换为arraybase格式
+				start = time.Now().UnixMilli()
 				rebuildsAB, err := cli.tikvCli.FindShardMetas(ctx, resp.Rebuilds)
 				if err != nil {
 					entry.WithError(err).Errorf("Convert rebuild metas of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("convert format of shardmetas in SN%d to arraybase format, cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				//删除数据转换为arraybase格式
+				start = time.Now().UnixMilli()
 				deletesAB, err := cli.tikvCli.FindDeleteMetas(ctx, resp.BlockDel)
 				if err != nil {
 					entry.WithError(err).Errorf("Convert delete metas of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("convert format of deletes in SN%d to arraybase format, cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				// //预处理tikv中要删除的block
 				// deletedIDs := make([]uint64, 0)
 				// for _, bdel := range deletesAB {
 				// 	deletedIDs = append(deletedIDs, bdel)
 				// }
+				start = time.Now().UnixMilli()
 				dblocks, err := cli.arraybase.Read(deletesAB)
 				if err != nil {
 					entry.WithError(err).Errorf("read blocks of SN%d before deleted", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("read deleted blocks in arraybase of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
+				start = time.Now().UnixMilli()
 				deletedKeys := make([][]byte, 0)
 				for _, dblk := range dblocks {
 					for k, v := range dblk.Shards {
@@ -174,27 +185,35 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("delete blocks in tikv of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				//修改写入arraybase
+				start = time.Now().UnixMilli()
 				from, to, err := cli.arraybase.Write(blocksAB, rebuildsAB, deletesAB)
 				if err != nil {
 					entry.WithError(err).Errorf("write arraybase of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("modify arraybase of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				//shard写入tikv
+				start = time.Now().UnixMilli()
 				err = cli.tikvCli.InsertShardMetas(ctx, blocksAB, from, to)
 				if err != nil {
 					entry.WithError(err).Errorf("insert shard metas of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("write shardmetas in tikv of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
 				//写入重建后分片
+				start = time.Now().UnixMilli()
 				err = cli.tikvCli.InsertNodeShards(ctx, cli.arraybase, rebuildsAB)
 				if err != nil {
 					entry.WithError(err).Errorf("update rebuilt shards of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
+				entry.Debugf("write nodeshards in tikv of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
+				entry.Debugf("total operation of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-begin)
 				// rebuildIndexes := make([]uint64, 0)
 				// for _, v := range rebuildsAB {
 				// 	rebuildIndexes = append(rebuildIndexes, v.BIndex)
