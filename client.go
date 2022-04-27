@@ -165,13 +165,15 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 				start = time.Now().UnixMilli()
 				deletedKeys := make([][]byte, 0)
 				for _, dblk := range dblocks {
-					for k, v := range dblk.Shards {
-						//deletedKeys = append(deletedKeys, []byte(shardmetasKey(int64(dblk.ID)+int64(k))))
-						if v.NodeID != 0 {
-							deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID))))
-						}
-						if v.NodeID2 != 0 {
-							deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID2))))
+					if dblk != nil {
+						for k, v := range dblk.Shards {
+							//deletedKeys = append(deletedKeys, []byte(shardmetasKey(int64(dblk.ID)+int64(k))))
+							if v.NodeID != 0 {
+								deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID))))
+							}
+							if v.NodeID2 != 0 {
+								deletedKeys = append(deletedKeys, []byte(shardsNodeKey(int64(dblk.ID)+int64(k), int32(v.NodeID2))))
+							}
 						}
 					}
 				}
