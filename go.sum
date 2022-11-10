@@ -486,8 +486,8 @@ github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 h1:eY9dn8+vbi4tKz5
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/yookoala/realpath v1.0.0/go.mod h1:gJJMA9wuX7AcqLy1+ffPatSCySA1FQ2S8Ya9AIoYBpE=
-github.com/yottachain/yotta-arraybase v0.0.3 h1:n3ALwcgwshPztmLyGSCZ9a0xcWOwcXfz5YFD6yS4zT4=
-github.com/yottachain/yotta-arraybase v0.0.3/go.mod h1:ifkkMhnH+dDyKdaXesW3QLz2zjUdwixiSULUI0/z5VQ=
+github.com/yottachain/yotta-arraybase v0.0.4 h1:D8MV8osATr4XeR5/59+ZfKTf/kr9p6I+2nw43kmSdWU=
+github.com/yottachain/yotta-arraybase v0.0.4/go.mod h1:ifkkMhnH+dDyKdaXesW3QLz2zjUdwixiSULUI0/z5VQ=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
