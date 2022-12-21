@@ -1,56 +1,55 @@
 server:
-  bind-addr: ":8080"
+  #服务端http服务监听地址
+  bind-addr: ":8081"
+  #服务端的源数据库URL
   mongodb-url: "mongodb://127.0.0.1:27017/?connect=direct"
+  #源数据库名
   db-name: "metabase"
+  #矿机数据库名
   miner-db-name: "yotta"
+  #所属SN编号
   sn-id: 0
+  #最近几分钟内的数据不进行同步，用于调用GetStoredShards接口时避免一致性问题，单位为秒
   skip-time: 300
+#客户端配置
 client:
+  #客户端http服务监听地址
   bind-addr: ":8083"
-  pd-urls:
-  - "192.168.1.21:2379"
-  - "192.168.1.64:2379"
-  - "192.168.1.81:2379"
+  #客户端的TIKV集群的PD URLs
+  pd-urls: 
+  - "127.0.0.1:2379"
+  #要连接的服务端地址，按SN编号顺序依次配置
   all-sync-urls:
-  - "http://192.168.1.145:8087"
-  - "http://192.168.1.144:8087"
-  - "http://192.168.1.133:8087"
+  - "http://127.0.0.1:8051"
+  - "http://127.0.0.1:8052"
+  - "http://127.0.0.1:8053"
+  #从该时间点开始进行同步，格式为UNIX时间戳
   start-time: 0
-  batch-size: 100
+  #同步时每次拉取的分块数量
+  batch-size: 10000
+  #当没有新数据可同步时进程等待的时间，单位为秒
   wait-time: 30
+  #最近几分钟内的数据不进行同步，用于避免一致性问题，单位为秒
   skip-time: 300
+  #数组文件配置
   arraybase:
-    base-dir: "e:\\arraybase"
+    #数组文件路径
+    base-dir: "/app/yotta-sync/arraybase"
+    #每个文件多少行数据
     rows-per-file: 10000000
+    #读缓存大小
     read-buf-len: 10
+    #写缓存大小
     write-buf-len: 10
+#日志配置
 logger:
+  #日志输出类型：stdout为输出到标准输出流，file为输出到文件，默认为stdout，此时只有level属性起作用，其他属性会被忽略
   output: "file"
+  #日志路径，默认值为./rebuilder.log，仅在output=file时有效
   file-path: "./sync.log"
+  #日志拆分间隔时间，默认为24（小时），仅在output=file时有效
   rotation-time: 24
+  #日志最大保留时间，默认为240（10天），仅在output=file时有效
   max-age: 240
-  level: "Debug"
-
-#client:
-#  bind-addr: ":8080"
-#  pd-urls: 
-#  - "127.0.0.1:2379"
-#  all-sync-urls:
-#  - "http://192.168.36.132:8051"
-#  - "http://192.168.36.132:8052"
-#  - "http://192.168.36.132:8053"
-#  start-time: 0
-#  batch-size: 100
-#  wait-time: 30
-#  skip-time: 300
-#  arraybase:
-#    base-dir: "/mnt/arraybase"
-#    rows-per-file: 10000000
-#    read-buf-len: 10
-#    write-buf-len: 10
-#logger:
-#  output: "file"
-#  file-path: "./sync.log"
-#  rotation-time: 24
-#  max-age: 240
-#  level: "Info"
+  #日志输出等级，默认为Info
+  level: "Info"

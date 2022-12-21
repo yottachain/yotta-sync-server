@@ -3,6 +3,12 @@ package ytsync
 const (
 	//ServerBindAddrField field name of server.bind-addr
 	ServerBindAddrField = "server.bind-addr"
+	//ServerBindAddrSecureField field name of server.bind-addr-secure
+	//ServerBindAddrSecureField = "server.bind-addr-secure"
+	//ServerCertPathField field name of server.cert-path
+	//ServerCertPathField = "server.cert-path"
+	//ServerKeyPathField field name of server.key-path
+	//ServerKeyPathField = "server.key-path"
 	//ServerMongoDBURLField field name of server.mongodb-url
 	ServerMongoDBURLField = "server.mongodb-url"
 	//ServerDBNameField field name of server.db-name
@@ -16,6 +22,12 @@ const (
 
 	//ClientBindAddrField field name of client.bind-addr
 	ClientBindAddrField = "client.bind-addr"
+	//ClientBindAddrSecureField field name of client.bind-addr-secure
+	//ClientBindAddrSecureField = "client.bind-addr-secure"
+	//ClientCertPathField field name of client.cert-path
+	//ClientCertPathField = "client.cert-path"
+	//ClientKeyPathField field name of client.key-path
+	//ClientKeyPathField = "client.key-path"
 	//ClientPDURLsField field name of client.pd-urls
 	ClientPDURLsField = "client.pd-urls"
 	//ClientAllSyncURLsField Field name of client.all-sync-urls
@@ -59,7 +71,10 @@ type Config struct {
 
 //ServerConfig server configuration
 type ServerConfig struct {
-	BindAddr    string `mapstructure:"bind-addr"`
+	BindAddr string `mapstructure:"bind-addr"`
+	//BindAddrSecure string `mapstructure:"bind-addr-secure"`
+	//CertPath       string `mapstructure:"cert-path"`
+	//KeyPath        string `mapstructure:"key-path"`
 	MongoDBURL  string `mapstructure:"mongodb-url"`
 	DBName      string `mapstructure:"db-name"`
 	MinerDBName string `mapstructure:"miner-db-name"`
@@ -69,7 +84,10 @@ type ServerConfig struct {
 
 //ClientConfig client configuration
 type ClientConfig struct {
-	BindAddr    string           `mapstructure:"bind-addr"`
+	BindAddr string `mapstructure:"bind-addr"`
+	//BindAddrSecure string           `mapstructure:"bind-addr-secure"`
+	//CertPath       string           `mapstructure:"cert-path"`
+	//KeyPath        string           `mapstructure:"key-path"`
 	PDURLs      []string         `mapstructure:"pd-urls"`
 	AllSyncURLs []string         `mapstructure:"all-sync-urls"`
 	StartTime   int32            `mapstructure:"start-time"`

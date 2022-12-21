@@ -3,9 +3,11 @@ package ytsync
 import (
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,16 +17,18 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
-	"github.com/tylerb/graceful"
 	ytab "github.com/yottachain/yotta-arraybase"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 var checkPoints map[int32]int64
 
 //Client client struct
 type Client struct {
-	server    *echo.Echo
-	httpCli   *http.Client
+	server  *echo.Echo
+	httpCli *http.Client
+	//httpCli2  *http.Client
 	tikvCli   *TikvDao
 	arraybase *ytab.ArrayBase
 	SyncURLs  []string
@@ -49,7 +53,20 @@ func NewClient(ctx context.Context, baseDir string, rowsPerFile uint64, readChLe
 		entry.WithError(err).Errorf("creating arraybase failed: basedir->%s, rowsperfile->%d, readchlen->%d, writechlen->%d", baseDir, rowsPerFile, readChLen, writeChLen)
 		return nil, err
 	}
-	return &Client{server: server, httpCli: &http.Client{}, tikvCli: tikvCli, arraybase: arraybase, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
+	// httpCli2 := &http.Client{
+	// 	Transport: &http2.Transport{
+	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// 	},
+	// }
+	httpCli := &http.Client{
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+		},
+	}
+	return &Client{server: server, httpCli: httpCli, tikvCli: tikvCli, arraybase: arraybase, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
 }
 
 //StartClient start client service
@@ -68,13 +85,43 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 	}))
 	cli.server.GET("getCheckPoints", cli.GetCheckPoints)
 	cli.server.GET("getBlocks", cli.GetBlocks)
-	cli.server.Server.Addr = bindAddr
+
+	h2s := &http2.Server{}
+	svr := http.Server{
+		Addr:    bindAddr,
+		Handler: h2c.NewHandler(cli.server, h2s),
+		//ReadTimeout: 30 * time.Second, // customize http.Server timeouts
+	}
+
 	go func() {
-		err := graceful.ListenAndServe(cli.server.Server, 5*time.Second)
-		if err != nil {
+		if err := svr.ListenAndServe(); err != http.ErrServerClosed {
 			log.WithError(err).Errorf("start http server failed: %s", bindAddr)
 		}
 	}()
+
+	// if bindAddrSecure != "" {
+	// 	svrsecure := http.Server{
+	// 		Addr:      bindAddrSecure,
+	// 		Handler:   cli.server, // set Echo as handler
+	// 		TLSConfig: &tls.Config{
+	// 			//Certificates: nil, // <-- s.ListenAndServeTLS will populate this field
+	// 		},
+	// 		//ReadTimeout: 30 * time.Second, // use custom timeouts
+	// 	}
+	// 	go func() {
+	// 		if err := svrsecure.ListenAndServeTLS(certPath, keyPath); err != http.ErrServerClosed {
+	// 			log.WithError(err).Errorf("start https server failed: %s", bindAddrSecure)
+	// 		}
+	// 	}()
+	// }
+
+	// cli.server.Server.Addr = bindAddr
+	// go func() {
+	// 	err := graceful.ListenAndServe(cli.server.Server, 5*time.Second)
+	// 	if err != nil {
+	// 		log.WithError(err).Errorf("start http server failed: %s", bindAddr)
+	// 	}
+	// }()
 
 	for i := 0; i < snCount; i++ {
 		snID := int32(i)
@@ -109,7 +156,11 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 				start := time.Now().UnixMilli()
 				begin := start
 				entry.Debugf("ready for fetching sync data")
-				resp, err := GetSyncData(cli.httpCli, cli.SyncURLs[snID], checkPoint.Start, cli.BatchSize, cli.SkipTime)
+				hcli := cli.httpCli
+				// if strings.HasPrefix(cli.SyncURLs[snID], "https") {
+				// 	hcli = cli.httpCli2
+				// }
+				resp, err := GetSyncData(hcli, cli.SyncURLs[snID], checkPoint.Start, cli.BatchSize, cli.SkipTime)
 				if err != nil {
 					entry.WithError(err).Errorf("Get sync data of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
@@ -379,7 +430,7 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 //GetSyncData find synchronization data
 func GetSyncData(httpCli *http.Client, url string, from int64, size int, skip int) (*DataResp, error) {
 	entry := log.WithFields(log.Fields{Function: "GetSyncData"})
-	fullURL := fmt.Sprintf("%s/sync/getSyncData?from=%d&size=%d&skip=%d", url, from, size, skip)
+	fullURL := fmt.Sprintf("%s/sync/getSyncData?from=%d&size=%d&skip=%d&bsonly=false", url, from, size, skip)
 	entry.Debugf("fetching sync data by URL: %s", fullURL)
 	request, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {

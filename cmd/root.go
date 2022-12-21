@@ -142,6 +142,12 @@ func initConfig() {
 var (
 	//DefaultServerBindAddr default value of ServerBindAddr
 	DefaultServerBindAddr string = ":8087"
+	//DefaultServerBindAddrSecure default value of ServerBindAddrSecure
+	//DefaultServerBindAddrSecure string = ":8487"
+	//DefaultServerCertPath default value of ServerCertPath
+	//DefaultServerCertPath string = "cert.pem"
+	//DefaultServerKeyPath default value of ServerKeyPath
+	//DefaultServerKeyPath string = "key.pem"
 	//DefaultServerMongoDBURL default value of ServerMongoDBURL
 	DefaultServerMongoDBURL string = "mongodb://127.0.0.1:27017/?connect=direct"
 	//DefaultServerDBName default value of ServerDBName
@@ -155,6 +161,12 @@ var (
 
 	//DefaultClientBindAddr default value of ClientBindAddr
 	DefaultClientBindAddr string = ":8087"
+	//DefaultClientBindAddrSecure default value of ClientBindAddrSecure
+	//DefaultClientBindAddrSecure string = ":8487"
+	//DefaultClientCertPath default value of ClientCertPath
+	//DefaultClientCertPath string = "cert.pem"
+	//DefaultClientKeyPath default value of ClientKeyPath
+	//DefaultClientKeyPath string = "key.pem"
 	//DefaultClientPDURLs default value of ClientPDURLs
 	DefaultClientPDURLs []string = []string{}
 	//DefaultClientAllSyncURLs default value of ClientAllSyncURLs
@@ -192,6 +204,12 @@ func initFlag() {
 	//server config
 	rootCmd.PersistentFlags().String(ytsync.ServerBindAddrField, DefaultServerBindAddr, "Binding address of synchronization http server")
 	viper.BindPFlag(ytsync.ServerBindAddrField, rootCmd.PersistentFlags().Lookup(ytsync.ServerBindAddrField))
+	// rootCmd.PersistentFlags().String(ytsync.ServerBindAddrSecureField, DefaultServerBindAddrSecure, "Binding address of synchronization https server")
+	// viper.BindPFlag(ytsync.ServerBindAddrSecureField, rootCmd.PersistentFlags().Lookup(ytsync.ServerBindAddrSecureField))
+	// rootCmd.PersistentFlags().String(ytsync.ServerCertPathField, DefaultServerCertPath, "cert path of synchronization https server")
+	// viper.BindPFlag(ytsync.ServerCertPathField, rootCmd.PersistentFlags().Lookup(ytsync.ServerCertPathField))
+	// rootCmd.PersistentFlags().String(ytsync.ServerKeyPathField, DefaultServerKeyPath, "key path of synchronization https server")
+	// viper.BindPFlag(ytsync.ServerKeyPathField, rootCmd.PersistentFlags().Lookup(ytsync.ServerKeyPathField))
 	rootCmd.PersistentFlags().String(ytsync.ServerMongoDBURLField, DefaultServerMongoDBURL, "URL of Source mongoDB")
 	viper.BindPFlag(ytsync.ServerMongoDBURLField, rootCmd.PersistentFlags().Lookup(ytsync.ServerMongoDBURLField))
 	rootCmd.PersistentFlags().String(ytsync.ServerDBNameField, DefaultServerDBName, "name of source database")
@@ -205,6 +223,12 @@ func initFlag() {
 	//client config
 	rootCmd.PersistentFlags().String(ytsync.ClientBindAddrField, DefaultClientBindAddr, "Binding address of synchronization client http server")
 	viper.BindPFlag(ytsync.ClientBindAddrField, rootCmd.PersistentFlags().Lookup(ytsync.ClientBindAddrField))
+	// rootCmd.PersistentFlags().String(ytsync.ClientBindAddrSecureField, DefaultClientBindAddrSecure, "Binding address of synchronization client https server")
+	// viper.BindPFlag(ytsync.ClientBindAddrSecureField, rootCmd.PersistentFlags().Lookup(ytsync.ClientBindAddrSecureField))
+	// rootCmd.PersistentFlags().String(ytsync.ClientCertPathField, DefaultClientCertPath, "cert path of synchronization client https server")
+	// viper.BindPFlag(ytsync.ClientCertPathField, rootCmd.PersistentFlags().Lookup(ytsync.ClientCertPathField))
+	// rootCmd.PersistentFlags().String(ytsync.ClientKeyPathField, DefaultClientKeyPath, "key path of synchronization client https server")
+	// viper.BindPFlag(ytsync.ClientKeyPathField, rootCmd.PersistentFlags().Lookup(ytsync.ClientKeyPathField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientPDURLsField, DefaultClientPDURLs, "URLs of PD")
 	viper.BindPFlag(ytsync.ClientPDURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientPDURLsField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientAllSyncURLsField, DefaultClientAllSyncURLs, "all URLs of sync services, in the form of --client.all-sync-urls \"URL1,URL2,URL3\"")

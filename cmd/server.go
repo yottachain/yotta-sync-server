@@ -24,7 +24,7 @@ var serverCmd = &cobra.Command{
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when creating synchronization service: %s\n", err))
 		}
-		err = svr.StartServer(config.Server.BindAddr)
+		err = svr.StartServer(config.Server.BindAddr) //, config.Server.BindAddrSecure, config.Server.CertPath, config.Server.KeyPath)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when starting synchronization service: %s\n", err))
 		}

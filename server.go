@@ -12,10 +12,11 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
-	"github.com/tylerb/graceful"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 //Server server struct
@@ -59,19 +60,59 @@ func (server *Server) StartServer(bindAddr string) error {
 	server.server.GET("sync/GetStoredShards", server.GetStoredShards)
 	server.server.GET("sync/getMinerLogs", server.GetMinerLogs)
 	server.server.GET("sync/getMiners", server.GetMiners)
-	server.server.Server.Addr = bindAddr
-	err := graceful.ListenAndServe(server.server.Server, 5*time.Second)
-	if err != nil {
-		entry.WithError(err).Error("start sync server failed")
+
+	//errs := make(chan error)
+	h2s := &http2.Server{}
+	svr := http.Server{
+		Addr:    bindAddr,
+		Handler: h2c.NewHandler(server.server, h2s),
+		//ReadTimeout: 30 * time.Second, // customize http.Server timeouts
 	}
-	return err
+
+	// go func() {
+	// 	if err := svr.ListenAndServe(); err != http.ErrServerClosed {
+	// 		errs <- err
+	// 	}
+	// }()
+
+	// if bindAddrSecure != "" {
+	// 	svrsecure := http.Server{
+	// 		Addr:      bindAddrSecure,
+	// 		Handler:   server.server, // set Echo as handler
+	// 		TLSConfig: &tls.Config{
+	// 			//Certificates: nil, // <-- s.ListenAndServeTLS will populate this field
+	// 		},
+	// 		//ReadTimeout: 30 * time.Second, // use custom timeouts
+	// 	}
+	// 	go func() {
+	// 		if err := svrsecure.ListenAndServeTLS(certPath, keyPath); err != http.ErrServerClosed {
+	// 			errs <- err
+	// 		}
+	// 	}()
+	// }
+
+	// select {
+	// case err := <-errs:
+	// 	entry.WithError(err).Error("start sync server failed")
+	// 	return err
+	// }
+
+	// server.server.Server.Addr = bindAddr
+	//err := graceful.ListenAndServeTLS(server.server.Server, "cert.pem", "key.pem", 5*time.Second)
+
+	if err := svr.ListenAndServe(); err != http.ErrServerClosed {
+		entry.WithError(err).Error("start sync server failed")
+		return err
+	}
+	return nil
 }
 
 //SyncQuery struct
 type SyncQuery struct {
-	From int64 `json:"from" form:"from" query:"from"`
-	Size int64 `json:"size" form:"size" query:"size"`
-	Skip int64 `json:"skip" form:"skip" query:"skip"`
+	From   int64 `json:"from" form:"from" query:"from"`
+	Size   int64 `json:"size" form:"size" query:"size"`
+	Skip   int64 `json:"skip" form:"skip" query:"skip"`
+	BsOnly bool  `json:"bsonly" form:"bsonly" query:"bsonly"`
 }
 
 //RebuildQuery struct
@@ -101,7 +142,7 @@ func (server *Server) GetSyncData(c echo.Context) error {
 	if err := c.Bind(q); err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	resp, err := server.dao.GetSyncData(context.Background(), q.From, q.Size, q.Skip)
+	resp, err := server.dao.GetSyncData(context.Background(), q.From, q.Size, q.Skip, q.BsOnly)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -210,10 +251,10 @@ func (server *Server) GetMinerLogs(c echo.Context) error {
 }
 
 //GetSyncData get range data
-func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (*DataResp, error) {
+func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64, bsOnly bool) (*DataResp, error) {
 	entry := log.WithFields(log.Fields{Function: "GetSyncData"})
 	if size == 0 || skip == 0 {
-		err := fmt.Errorf("invalid parameters: from -> %d, size -> %d, skip -> %d", from, size, skip)
+		err := fmt.Errorf("invalid parameters: from -> %d, size -> %d, skip -> %d, bsonly -> %t", from, size, skip, bsOnly)
 		entry.WithError(err).Error("invalid parameters")
 		return nil, err
 	}
@@ -340,6 +381,9 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 	go func() {
 		//fetch rebuild meta
 		defer wg.Done()
+		if bsOnly {
+			return
+		}
 		opts = new(options.FindOptions)
 		opts.Sort = bson.M{"_id": 1}
 		rCur, err := rebuildTab.Find(ctx, bson.M{"_id": bson.M{"$gte": resp.From, "$lt": resp.Next}}, opts)
@@ -365,6 +409,9 @@ func (dao *ServerDao) GetSyncData(ctx context.Context, from, size, skip int64) (
 	go func() {
 		//fetch delete meta
 		defer wg.Done()
+		if bsOnly {
+			return
+		}
 		opts = new(options.FindOptions)
 		opts.Sort = bson.M{"_id": 1}
 		rCur, err := delTable.Find(ctx, bson.M{"_id": bson.M{"$gte": resp.From, "$lt": resp.Next}}, opts)

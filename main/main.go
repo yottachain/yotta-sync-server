@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"sort"
 	"strconv"
@@ -13,10 +16,36 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/net/http2"
 )
 
 func main() {
 	cmd.Execute()
+}
+
+func main2() {
+	cli1 := &http.Client{
+		Transport: &http2.Transport{
+			//TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			AllowHTTP: true,
+			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+		},
+	}
+	req, err := http.NewRequest("GET", "http://localhost:8081/sync/getSyncData?from=0&size=1&skip=300&bsonly=false", nil)
+	if err != nil {
+		panic(err)
+	}
+	//req = req.WithContext(ctx)
+
+	resp, err := cli1.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	fmt.Println("Protocol:", resp.Proto)
+	return
 }
 
 func main0() {

@@ -9,7 +9,7 @@ $ go build -o yotta-sync-server
 ```
 #服务端配置
 server:
-  #服务端监听地址
+  #服务端http服务监听地址
   bind-addr: ":8080"
   #服务端的源数据库URL
   mongodb-url: "mongodb://127.0.0.1:27017/?connect=direct"
@@ -23,6 +23,8 @@ server:
   skip-time: 300
 #客户端配置
 client:
+  #客户端http服务监听地址
+  bind-addr: ":8080"
   #客户端的TIKV集群的PD URLs
   pd-urls: 
   - "127.0.0.1:2379"
@@ -39,6 +41,16 @@ client:
   wait-time: 30
   #最近几分钟内的数据不进行同步，用于避免一致性问题，单位为秒
   skip-time: 300
+  #数组文件配置
+  arraybase:
+    #数组文件路径
+    base-dir: "/app/yotta-sync/arraybase"
+    #每个文件多少行数据
+    rows-per-file: 10000000
+    #读缓存大小
+    read-buf-len: 10
+    #写缓存大小
+    write-buf-len: 10
 #日志配置
 logger:
   #日志输出类型：stdout为输出到标准输出流，file为输出到文件，默认为stdout，此时只有level属性起作用，其他属性会被忽略
@@ -52,7 +64,6 @@ logger:
   #日志输出等级，默认为Info
   level: "Info"
 ```
-
 # 2. 启动服务
 ## 2.1 服务端启动
 服务端配置设置完毕后执行以下命令启动：
@@ -64,34 +75,4 @@ $ nohup ./yotta-sync-server server &
 客户端配置设置完毕后执行以下命令启动：
 ```
 $ nohup ./yotta-sync-server client &
-```
-
-# 3. 数据库配置
-```
-CREATE DATABASE `metabase`;
-CREATE TABLE `blocks` (
-  `id` bigint(20) NOT NULL,
-  `vnf` int(11) NOT NULL,
-  `ar` int(11) NOT NULL,
-  `snid` int(11) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE `shards` (
-  `id` bigint(20) NOT NULL,
-  `nid` int(11) NOT NULL,
-  `vhf` binary(16) NOT NULL,
-  `bid` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`,`nid`),
-  KEY `nid_id` (`nid`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
-PARTITION BY HASH(nid)
-PARTITIONS 50;
-
-CREATE TABLE `checkpoint` (
-  `id` int(11) NOT NULL,
-  `start` bigint(20) NOT NULL,
-  `timestamp` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 ```
