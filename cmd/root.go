@@ -169,6 +169,14 @@ var (
 	//DefaultClientKeyPath string = "key.pem"
 	//DefaultClientPDURLs default value of ClientPDURLs
 	DefaultClientPDURLs []string = []string{}
+	//DefaultESConfigURLs default value of ESConfigURLs
+	DefaultESConfigURLs []string = []string{"http://127.0.0.1:9200"}
+	//DefaultESConfigUserName default value of ESConfigUserName
+	DefaultESConfigUserName string = ""
+	//DefaultESConfigPassword default value of ESConfigPassword
+	DefaultESConfigPassword string = ""
+	//DefaultESConfigEnable default value of ESConfigEnable
+	DefaultESConfigEnable bool = false
 	//DefaultClientAllSyncURLs default value of ClientAllSyncURLs
 	DefaultClientAllSyncURLs []string = []string{}
 	//DefaultClientStartTime default value of ClientStartTime
@@ -231,6 +239,15 @@ func initFlag() {
 	// viper.BindPFlag(ytsync.ClientKeyPathField, rootCmd.PersistentFlags().Lookup(ytsync.ClientKeyPathField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientPDURLsField, DefaultClientPDURLs, "URLs of PD")
 	viper.BindPFlag(ytsync.ClientPDURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientPDURLsField))
+	//ES config
+	rootCmd.PersistentFlags().StringSlice(ytsync.ESURLsField, DefaultESConfigURLs, "URLs of ES")
+	viper.BindPFlag(ytsync.ESURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ESURLsField))
+	rootCmd.PersistentFlags().String(ytsync.ESUserNameField, DefaultESConfigUserName, "username of elasticsearch")
+	viper.BindPFlag(ytsync.ESUserNameField, rootCmd.PersistentFlags().Lookup(ytsync.ESUserNameField))
+	rootCmd.PersistentFlags().String(ytsync.ESPasswordField, DefaultESConfigPassword, "password of elasticsearch")
+	viper.BindPFlag(ytsync.ESPasswordField, rootCmd.PersistentFlags().Lookup(ytsync.ESPasswordField))
+	rootCmd.PersistentFlags().Bool(ytsync.ESEnableField, DefaultESConfigEnable, "whether enable sync mechanism on elasticsearch")
+	viper.BindPFlag(ytsync.ESEnableField, rootCmd.PersistentFlags().Lookup(ytsync.ESEnableField))
 	rootCmd.PersistentFlags().StringSlice(ytsync.ClientAllSyncURLsField, DefaultClientAllSyncURLs, "all URLs of sync services, in the form of --client.all-sync-urls \"URL1,URL2,URL3\"")
 	viper.BindPFlag(ytsync.ClientAllSyncURLsField, rootCmd.PersistentFlags().Lookup(ytsync.ClientAllSyncURLsField))
 	rootCmd.PersistentFlags().Int32(ytsync.ClientStartTimeField, DefaultClientStartTime, "synchronizing from this timestamp")

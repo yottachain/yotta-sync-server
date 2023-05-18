@@ -234,7 +234,7 @@ func (tikvDao *TikvDao) InsertNodeShards(ctx context.Context, arraybase *ytab.Ar
 	vals := make([][]byte, 0)
 	for _, v := range rebuildsAB {
 		r := rebuildBlocks[v.BIndex]
-		if r.ID == 0 {
+		if r == nil || r.ID == 0 {
 			continue
 		}
 		keys = append(keys, []byte(shardsNodeKey(int64(r.ID)+int64(v.Offset), int32(r.Shards[int(v.Offset)].NodeID))))

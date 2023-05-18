@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,7 @@ func (server *Server) StartServer(bindAddr string) error {
 	server.server.GET("sync/getSyncData", server.GetSyncData)
 	server.server.GET("sync/getShardRebuildMetas", server.GetRebuildData)
 	server.server.GET("sync/GetStoredShards", server.GetStoredShards)
+	server.server.GET("sync/GetShards", server.GetShards)
 	server.server.GET("sync/getMinerLogs", server.GetMinerLogs)
 	server.server.GET("sync/getMiners", server.GetMiners)
 
@@ -127,6 +129,11 @@ type StoredShardsQuery struct {
 	To   int32 `json:"to" form:"to" query:"to"`
 }
 
+//ShardsQuery struct
+type ShardsQuery struct {
+	ShardIDs string `json:"ids" form:"ids" query:"ids"`
+}
+
 //MinerQuery struct
 type MinerQuery struct {
 	Start   int64 `json:"start" form:"start" query:"start"`
@@ -192,6 +199,38 @@ func (server *Server) GetStoredShards(c echo.Context) error {
 	toByte32 := Int32ToBytes(q.To)
 	to64 := BytesToInt64(append(toByte32, padding...))
 	resp, err := server.dao.GetStoredShards(context.Background(), from64, to64)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if resp == nil {
+		resp = make([]*Shard, 0)
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		entry.WithError(err).Error("marshaling data to json")
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSONBlob(http.StatusOK, b)
+}
+
+//GetShards fetch shards
+func (server *Server) GetShards(c echo.Context) error {
+	entry := log.WithFields(log.Fields{Function: "GetShards"})
+	q := new(ShardsQuery)
+	if err := c.Bind(q); err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	idstrs := strings.Split(q.ShardIDs, ",")
+	ids := make([]int64, 0)
+	for _, idstr := range idstrs {
+		id, err := strconv.ParseInt(idstr, 10, 64)
+		if err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+
+	resp, err := server.dao.GetShards(context.Background(), ids)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -545,6 +584,29 @@ func (dao *ServerDao) GetStoredShards(ctx context.Context, from, to int64) ([]*S
 		return nil, *innerErr
 	}
 	return append(shards1, shards2...), nil
+}
+
+//GetShards get shards
+func (dao *ServerDao) GetShards(ctx context.Context, shardIDs []int64) ([]*Shard, error) {
+	entry := log.WithFields(log.Fields{Function: "GetShards"})
+	shards := make([]*Shard, 0)
+	shardsTab := dao.dbCli.Database(dao.dbName).Collection(ShardsTab)
+	sCur, err := shardsTab.Find(ctx, bson.M{"_id": bson.M{"$in": shardIDs}})
+	if err != nil {
+		entry.WithError(err).Errorf("find shards from mongodb failed")
+		return nil, err
+	}
+	defer sCur.Close(ctx)
+	for sCur.Next(ctx) {
+		shard := new(Shard)
+		err := sCur.Decode(shard)
+		if err != nil {
+			entry.WithError(err).Error("decoding shard failed")
+			return nil, err
+		}
+		shards = append(shards, shard)
+	}
+	return shards, nil
 }
 
 //GetMiners get miner infos in period

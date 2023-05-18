@@ -18,6 +18,13 @@ client:
   #客户端的TIKV集群的PD URLs
   pd-urls: 
   - "127.0.0.1:2379"
+  #要同步重建信息到该ElasticSearch地址，enable为true则启动同步
+  esconfig:
+    urls:
+    - "http://127.0.0.1:9200"
+    username: "elastic"
+    password: "password"
+    enable: true
   #要连接的服务端地址，按SN编号顺序依次配置
   all-sync-urls:
   - "http://127.0.0.1:8051"

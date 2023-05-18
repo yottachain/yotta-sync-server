@@ -30,6 +30,14 @@ const (
 	//ClientKeyPathField = "client.key-path"
 	//ClientPDURLsField field name of client.pd-urls
 	ClientPDURLsField = "client.pd-urls"
+	//ESURLsField Field name of esconfig.urls config
+	ESURLsField = "esconfig.urls"
+	//ESUserNameField Field name of esconfig.username config
+	ESUserNameField = "esconfig.username"
+	//ESPasswordField Field name of esconfig.password config
+	ESPasswordField = "esconfig.password"
+	//ESEnableField Field name of esconfig.enable config
+	ESEnableField = "esconfig.enable"
 	//ClientAllSyncURLsField Field name of client.all-sync-urls
 	ClientAllSyncURLsField = "client.all-sync-urls"
 	//ClientStartTimeField Field name of client.start-time
@@ -89,12 +97,21 @@ type ClientConfig struct {
 	//CertPath       string           `mapstructure:"cert-path"`
 	//KeyPath        string           `mapstructure:"key-path"`
 	PDURLs      []string         `mapstructure:"pd-urls"`
+	ESConfig    *ESConfig        `mapstructure:"esconfig"`
 	AllSyncURLs []string         `mapstructure:"all-sync-urls"`
 	StartTime   int32            `mapstructure:"start-time"`
 	BatchSize   int              `mapstructure:"batch-size"`
 	WaitTime    int              `mapstructure:"wait-time"`
 	SkipTime    int              `mapstructure:"skip-time"`
 	ArrayBase   *ArrayBaseConfig `mapstructure:"arraybase"`
+}
+
+//ElasticSearch configuration
+type ESConfig struct {
+	URLs     []string `mapstructure:"urls"`
+	UserName string   `mapstructure:"username"`
+	Password string   `mapstructure:"password"`
+	Enable   bool     `mapstructure:"enable"`
 }
 
 //ArrayBaseConfig arraybase configuration

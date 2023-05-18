@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	log "github.com/sirupsen/logrus"
@@ -31,6 +32,7 @@ type Client struct {
 	//httpCli2  *http.Client
 	tikvCli   *TikvDao
 	arraybase *ytab.ArrayBase
+	ESClient  *elasticsearch.Client
 	SyncURLs  []string
 	StartTime int32
 	BatchSize int
@@ -40,7 +42,7 @@ type Client struct {
 }
 
 //NewClient create a new client instance
-func NewClient(ctx context.Context, baseDir string, rowsPerFile uint64, readChLen, writeChLen int, pdURLs []string, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
+func NewClient(ctx context.Context, esURLs []string, esUserName, esPassword string, esEnable bool, baseDir string, rowsPerFile uint64, readChLen, writeChLen int, pdURLs []string, syncURLs []string, startTime int32, batchSize, waitTime, skipTime int) (*Client, error) {
 	entry := log.WithFields(log.Fields{Function: "NewClient"})
 	tikvCli, err := NewTikvDao(ctx, pdURLs)
 	if err != nil {
@@ -58,6 +60,21 @@ func NewClient(ctx context.Context, baseDir string, rowsPerFile uint64, readChLe
 	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	// 	},
 	// }
+	config := elasticsearch.Config{
+		Addresses: esURLs,
+		Username:  esUserName,
+		Password:  esPassword,
+	}
+	var esClient *elasticsearch.Client
+
+	if esEnable {
+		esClient, err = elasticsearch.NewClient(config)
+		if err != nil {
+			entry.WithError(err).Errorf("creating es client failed: %v", esURLs)
+			return nil, err
+		}
+	}
+
 	httpCli := &http.Client{
 		Transport: &http2.Transport{
 			AllowHTTP: true,
@@ -66,7 +83,7 @@ func NewClient(ctx context.Context, baseDir string, rowsPerFile uint64, readChLe
 			},
 		},
 	}
-	return &Client{server: server, httpCli: httpCli, tikvCli: tikvCli, arraybase: arraybase, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
+	return &Client{server: server, httpCli: httpCli, tikvCli: tikvCli, arraybase: arraybase, ESClient: esClient, SyncURLs: syncURLs, StartTime: startTime, BatchSize: batchSize, WaitTime: waitTime, SkipTime: skipTime}, nil
 }
 
 //StartClient start client service
@@ -261,11 +278,22 @@ func (cli *Client) StartClient(ctx context.Context, bindAddr string) error {
 				start = time.Now().UnixMilli()
 				err = cli.tikvCli.InsertNodeShards(ctx, cli.arraybase, rebuildsAB)
 				if err != nil {
-					entry.WithError(err).Errorf("update rebuilt shards of SN%d", snID)
+					entry.WithError(err).Errorf("update rebuilt shards in tikv of SN%d", snID)
 					time.Sleep(time.Duration(cli.WaitTime) * time.Second)
 					continue
 				}
 				entry.Debugf("write nodeshards in tikv of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
+				//删除ElasticSearch中分片
+				if cli.ESClient != nil {
+					start = time.Now().UnixMilli()
+					err = DeleteESNodeShards(ctx, cli.ESClient, resp.Rebuilds)
+					if err != nil {
+						entry.WithError(err).Errorf("update rebuilt shards in elasticsearch of SN%d", snID)
+						time.Sleep(time.Duration(cli.WaitTime) * time.Second)
+						continue
+					}
+					entry.Debugf("delete nodeshards in elasticsearch of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-start)
+				}
 				entry.Debugf("total operation of SN%d cost %d ms", resp.SNID, time.Now().UnixMilli()-begin)
 				// rebuildIndexes := make([]uint64, 0)
 				// for _, v := range rebuildsAB {
@@ -508,4 +536,21 @@ func (cli *Client) GetBlocks(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSONBlob(http.StatusOK, b)
+}
+
+func DeleteESNodeShards(ctx context.Context, esClient *elasticsearch.Client, metas []*ShardRebuildMeta) error {
+	entry := log.WithFields(log.Fields{Function: "DeleteESNodeShards"})
+	for i, meta := range metas {
+		var err error
+		if i == len(metas)-1 {
+			_, err = esClient.Delete("rebuildqueue", fmt.Sprintf("%d_%d", meta.SID, meta.VFI), esClient.Delete.WithContext(ctx), esClient.Delete.WithRefresh("wait_for"))
+		} else {
+			_, err = esClient.Delete("rebuildqueue", fmt.Sprintf("%d_%d", meta.SID, meta.VFI), esClient.Delete.WithContext(ctx))
+		}
+		if err != nil {
+			entry.WithError(err).Error("delete rebuild shard failed: %d_%d", meta.SID, meta.VFI)
+			return err
+		}
+	}
+	return nil
 }

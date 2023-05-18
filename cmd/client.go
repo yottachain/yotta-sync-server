@@ -22,7 +22,17 @@ var clientCmd = &cobra.Command{
 			panic(fmt.Sprintf("unable to decode into config struct, %v\n", err))
 		}
 		initLog(config)
-		client, err := ytsync.NewClient(context.Background(), config.Client.ArrayBase.BaseDir, config.Client.ArrayBase.RowsPerFile, config.Client.ArrayBase.ReadBufLen, config.Client.ArrayBase.WriteBufLen, config.Client.PDURLs, config.Client.AllSyncURLs, config.Client.StartTime, config.Client.BatchSize, config.Client.WaitTime, config.Client.SkipTime)
+		esURLs := []string{}
+		esUsername := ""
+		esPassword := ""
+		esEnable := false
+		if config.Client.ESConfig != nil {
+			esURLs = config.Client.ESConfig.URLs
+			esUsername = config.Client.ESConfig.UserName
+			esPassword = config.Client.ESConfig.Password
+			esEnable = config.Client.ESConfig.Enable
+		}
+		client, err := ytsync.NewClient(context.Background(), esURLs, esUsername, esPassword, esEnable, config.Client.ArrayBase.BaseDir, config.Client.ArrayBase.RowsPerFile, config.Client.ArrayBase.ReadBufLen, config.Client.ArrayBase.WriteBufLen, config.Client.PDURLs, config.Client.AllSyncURLs, config.Client.StartTime, config.Client.BatchSize, config.Client.WaitTime, config.Client.SkipTime)
 		if err != nil {
 			panic(fmt.Sprintf("fatal error when creating synchronization client: %s\n", err))
 		}
